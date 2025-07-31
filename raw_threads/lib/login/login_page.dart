@@ -14,6 +14,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  bool isLoading = false;
 
   @override
   void initState() {
@@ -21,6 +22,13 @@ class _LoginPageState extends State<LoginPage> {
     Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -42,14 +50,28 @@ class _LoginPageState extends State<LoginPage> {
             ),
             ElevatedButton(
               onPressed: () async {
+                setState(() {
+                  isLoading = true;
+                });
                 try {
                   await authService.value.signIn(
                     email: _emailController.text,
                     password: _passwordController.text,
                   );
-                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePage()));
+                  String? role = await authService.value.getRole();
+                  if (role == 'admin') {
+                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePage(role: 'admin')));
+                  } else if (role == 'user') {
+                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePage(role: 'user')));
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Role not recognized')));
+                  }
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                } finally {
+                  setState(() {
+                    isLoading = false;
+                  });
                 }
               },
               child: const Text('Login'),

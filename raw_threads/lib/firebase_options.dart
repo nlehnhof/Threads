@@ -54,6 +54,7 @@ class DefaultFirebaseOptions {
     appId: '1:933160059824:android:fb60da699d581a9b7d0c75',
     messagingSenderId: '933160059824',
     projectId: 'threads-f1173',
+    databaseURL: 'https://threads-f1173-default-rtdb.firebaseio.com/',
     storageBucket: 'threads-f1173.firebasestorage.app',
   );
 
@@ -62,6 +63,7 @@ class DefaultFirebaseOptions {
     appId: '1:933160059824:ios:afede209081bee1b7d0c75',
     messagingSenderId: '933160059824',
     projectId: 'threads-f1173',
+    databaseURL: 'https://threads-f1173-default-rtdb.firebaseio.com/',
     storageBucket: 'threads-f1173.firebasestorage.app',
     iosBundleId: 'com.example.rawThreads',
   );

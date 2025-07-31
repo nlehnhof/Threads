@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:raw_threads/home/home_page.dart';
 import 'package:raw_threads/login/login_page.dart';
 import 'package:raw_threads/login/signup_page.dart';
 
