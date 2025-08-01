@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:raw_threads/services/auth_service.dart';
-import 'package:raw_threads/home/home_page.dart'; 
+import 'package:raw_threads/pages/real_pages/home_page.dart'; 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:raw_threads/firebase_options.dart';
+import 'package:raw_threads/classes/style_classes/primary_button.dart';
+import 'package:raw_threads/classes/style_classes/my_colors.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -37,6 +39,7 @@ class _SignUpPageState extends State<SignUpPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: myColors.secondary,
       appBar: AppBar(title: const Text('Sign Up')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -46,15 +49,18 @@ class _SignUpPageState extends State<SignUpPage> {
               controller: _emailController,
               decoration: const InputDecoration(labelText: 'Email'),
             ),
+            const SizedBox(height: 10),
             TextField(
               controller: _passwordController,
               decoration: const InputDecoration(labelText: 'Password'),
               obscureText: true,
             ),
+            const SizedBox(height: 10),
             TextField(
               controller: _usernameController,
               decoration: const InputDecoration(labelText: 'Username'),
             ),
+            const SizedBox(height: 10),
             ToggleButtons(
               isSelected: isSelected,
               onPressed: (int index) {
@@ -75,25 +81,31 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
               ],
             ),
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  String selectedRole = isSelected[0] ? 'user' : 'admin';
+            const SizedBox(height: 10),
+            Container(
+              margin: const EdgeInsets.only(top: 20, bottom: 20),
+              child: PrimaryButton(
+                label: 'Sign Up',
+                color: myColors.primary,
+                color2: myColors.secondary,
+                onPressed: () async {
+                  try {
+                    String selectedRole = isSelected[0] ? 'user' : 'admin';
 
-                  await authService.value.createAccount(
-                    email: _emailController.text,
-                    password: _passwordController.text,
-                    role: selectedRole,
-                  );
-                  await authService.value.updateUsername(
-                    username: _usernameController.text,
-                  );
-                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomePage(role: selectedRole)));
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                }
-              },
-              child: const Text('Sign Up'),
+                    await authService.value.createAccount(
+                      email: _emailController.text,
+                      password: _passwordController.text,
+                      role: selectedRole,
+                    );
+                    await authService.value.updateUsername(
+                      username: _usernameController.text,
+                    );
+                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomePage(role: selectedRole)));
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                },
+              ),
             ),
           ],
         ),
