@@ -11,8 +11,11 @@ import 'repair_summary_page.dart';
 class RepairDetailsPage extends StatefulWidget {
   final Dances dance;
   final CostumePiece costume;
+  final String role;
 
-  const RepairDetailsPage({
+  const RepairDetailsPage(
+    this.role,
+    {
     super.key,
     required this.dance,
     required this.costume,
@@ -25,6 +28,7 @@ class RepairDetailsPage extends StatefulWidget {
 class _RepairDetailsPageState extends State<RepairDetailsPage> {
   List<Map<String, dynamic>> issueOptions = [];
   File? photo;
+  bool get isAdmin => widget.role == 'admin';
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController teamController = TextEditingController();
@@ -191,7 +195,7 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
             const Text('Select Repair Issues:', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             issueOptions.isEmpty
-                ? const Text("No issues found. Add some from the Issue Menu.")
+                ? const Text("No issues found. Add some to the Issue Menu.")
                 : Wrap(
                     spacing: 10,
                     runSpacing: 10,
@@ -237,6 +241,7 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
                         builder: (_) => RepairSummaryPage(
                           danceTitle: widget.dance.title,
                           costumeTitle: widget.costume.title,
+                          role: widget.role,
                         ),
                       ),
                     );

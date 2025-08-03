@@ -8,9 +8,12 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 class RepairSummaryPage extends StatefulWidget {
   final String danceTitle;
   final String costumeTitle;
+  final String role;
 
-  const RepairSummaryPage({
+  const RepairSummaryPage(
+    {
     super.key,
+    required this.role,
     required this.danceTitle,
     required this.costumeTitle,
   });
@@ -22,6 +25,7 @@ class RepairSummaryPage extends StatefulWidget {
 class _RepairSummaryPageState extends State<RepairSummaryPage> {
   late Future<Map<String, dynamic>> _repairDataFuture;
   File? _thumbnailFile;
+  bool get isAdmin => widget.role == 'admin';
 
   @override
   void initState() {
@@ -72,7 +76,7 @@ class _RepairSummaryPageState extends State<RepairSummaryPage> {
             onPressed: () {
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (_) => RepairPage()),
+                MaterialPageRoute(builder: (_) => RepairPage(widget.role)),
                 (route) => false,
               );
             },
@@ -83,7 +87,7 @@ class _RepairSummaryPageState extends State<RepairSummaryPage> {
       body: FutureBuilder<Map<String, dynamic>>(
         future: _repairDataFuture,
         builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          // if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final data = snapshot.data!;
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),

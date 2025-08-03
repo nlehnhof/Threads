@@ -5,7 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class IssueMenuPage extends StatefulWidget {
-  const IssueMenuPage({super.key});
+  final String role;
+  const IssueMenuPage({super.key, required this.role});
 
   @override
   State<IssueMenuPage> createState() => _IssueMenuPageState();
@@ -14,6 +15,7 @@ class IssueMenuPage extends StatefulWidget {
 class _IssueMenuPageState extends State<IssueMenuPage> {
   List<Map<String, dynamic>> issues = [];
   final TextEditingController _titleController = TextEditingController();
+  bool isAdmin = true;
 
   @override
   void initState() {
@@ -96,12 +98,18 @@ class _IssueMenuPageState extends State<IssueMenuPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.role == 'admin') {
+      isAdmin;
+    } else {
+      isAdmin = false;
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Issue Menu')),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: isAdmin ? FloatingActionButton(
         onPressed: addIssue,
         child: const Icon(Icons.add),
-      ),
+      ) : null,
       body: GridView.builder(
         padding: const EdgeInsets.all(12),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -114,7 +122,7 @@ class _IssueMenuPageState extends State<IssueMenuPage> {
         itemBuilder: (_, index) {
           final issue = issues[index];
           return GestureDetector(
-            onLongPress: () => deleteIssue(index),
+            onLongPress: () => isAdmin ? deleteIssue(index) : null,
             child: Card(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),

@@ -5,7 +5,8 @@ import 'package:raw_threads/services/dance_inventory_service.dart';
 import 'repair_details_page.dart';
 
 class RepairSelectionPage extends StatefulWidget {
-  const RepairSelectionPage({super.key});
+  final String role;
+  const RepairSelectionPage(this.role, {super.key});
 
   @override
   State<RepairSelectionPage> createState() => _RepairSelectionPageState();
@@ -15,6 +16,7 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
   Dances? selectedDance;
   String? selectedGender;
   CostumePiece? selectedCostume;
+  bool get isAdmin => widget.role == 'admin';
 
   @override
   void initState() {
@@ -24,7 +26,10 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
 
   Future<void> loadDances() async {
     await DanceInventoryService.instance.load();
-    setState(() {});
+    List<Dances> dances = DanceInventoryService.instance.dances;
+    setState(() {
+      dances = dances;
+    });
   }
 
   List<CostumePiece> get selectedCostumeList {
@@ -114,6 +119,7 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => RepairDetailsPage(
+                            widget.role,
                             dance: selectedDance!,
                             costume: selectedCostume!,
                           ),

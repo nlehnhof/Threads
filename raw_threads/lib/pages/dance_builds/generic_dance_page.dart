@@ -5,15 +5,27 @@ import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/pages/costume_builds/costume_page.dart';
 import 'package:raw_threads/services/dance_inventory_service.dart'; // ✅ Import your service
 
-class GenericDancePage extends StatelessWidget {
+class GenericDancePage extends StatefulWidget {
+  final String role;
   final Dances dance;
   final void Function(Dances) onDelete; // Called in parent page to update UI
 
   const GenericDancePage({
     super.key,
+    required this.role,
     required this.dance,
     required this.onDelete,
   });
+
+  @override
+  State<GenericDancePage> createState() => _GenericDancePageState();
+}
+
+class _GenericDancePageState extends State<GenericDancePage> {
+  late String role;
+  late Dances dance; 
+  late void Function(Dances) onDelete;
+  bool isAdmin = true;
 
   ImageProvider? _buildImage(String? path) {
     if (path == null) return null;
@@ -26,6 +38,13 @@ class GenericDancePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    
+    if (role == 'admin') {
+      isAdmin;
+    } else {
+      isAdmin = false;
+    }
+
     return Scaffold(
       backgroundColor: myColors.secondary,
       appBar: AppBar(
@@ -40,49 +59,50 @@ class GenericDancePage extends StatelessWidget {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.delete, color: Colors.black),
-            tooltip: 'Delete Dance',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Delete Dance?'),
-                  content: Text('Are you sure you want to delete "${dance.title}"?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        Navigator.of(context).pop(); // Close dialog
-                        await DanceInventoryService.instance.delete(dance.id); // Delete from storage
-                        onDelete(dance); // Update parent UI
-                        Navigator.of(context).pop(); // Close this page
-                      },
-                      child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                    ),
-                  ],
+          if (isAdmin)
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.black),
+              tooltip: 'Delete Dance',
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Delete Dance?'),
+                    content: Text('Are you sure you want to delete "${dance.title}"?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          Navigator.of(context).pop(); // Close dialog
+                          await DanceInventoryService.instance.delete(dance.id); // Delete from storage
+                            onDelete(dance); // Update parent UI
+                          Navigator.of(context).pop(); // Close this page
+                        },
+                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            TextButton(
+              onPressed: () {
+                // TODO: Implement edit dance functionality here
+                // You might show a dialog or navigate to an edit page
+              },
+              child: const Text(
+                'Edit',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 17,
+                  fontFamily: 'Raleway',
                 ),
-              );
-            },
-          ),
-          TextButton(
-            onPressed: () {
-              // TODO: Implement edit dance functionality here
-              // You might show a dialog or navigate to an edit page
-            },
-            child: const Text(
-              'Edit',
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 17,
-                fontFamily: 'Raleway',
               ),
             ),
-          ),
-        ],
+          ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(24),
@@ -108,21 +128,22 @@ class GenericDancePage extends StatelessWidget {
             const SizedBox(height: 12),
             _buildButton(context, 'Women'),
             const Spacer(),
-            SizedBox(
-              width: 337,
-              height: 60,
-              child: OutlinedButton(
-                onPressed: () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: myColors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            if (isAdmin)
+              SizedBox(
+                width: 337,
+                height: 60,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: myColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
+                  child: const Text('Assign to Team'),
                 ),
-                child: const Text('Assign to Team'),
               ),
-            ),
             const SizedBox(height: 44),
           ],
         ),
@@ -176,6 +197,7 @@ class GenericDancePage extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (_) => CostumePage(
+                role: role,
                 dance: dance,
                 gender: label,
               ),

@@ -6,7 +6,8 @@ import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:raw_threads/pages/dance_builds/add_generic_dialog.dart';
 
 class DanceInventoryPage extends StatefulWidget {
-  const DanceInventoryPage({super.key});
+  final String role;
+  const DanceInventoryPage({super.key, required this.role});
 
   @override
   State<DanceInventoryPage> createState() => _DanceInventoryPageState();
@@ -50,13 +51,15 @@ class _DanceInventoryPageState extends State<DanceInventoryPage> {
         title: const Text("Inventory"),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => showDialog(
-              context: context,
-              builder: (_) => AddGenericDialog(onSubmit: _addDance),
-            ),
-          )
+          if (widget.role == 'admin') ...[
+            IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: () => showDialog(
+                context: context,
+                builder: (_) => AddGenericDialog(onSubmit: _addDance),
+              ),
+            )
+          ],
         ],
       ),
       body: Column(
@@ -101,6 +104,7 @@ class _DanceInventoryPageState extends State<DanceInventoryPage> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => GenericDancePage(
+                          role: widget.role,
                           dance: dance,
                           onDelete: _deleteDance,
                         ),

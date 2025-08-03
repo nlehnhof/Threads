@@ -5,10 +5,11 @@ import 'package:raw_threads/services/dance_inventory_service.dart';
 import 'package:raw_threads/pages/costume_builds/add_edit_costume_dialog.dart';
 
 class CostumePage extends StatefulWidget {
+  final String role;
   final Dances dance;
   final String gender;
 
-  const CostumePage({super.key, required this.dance, required this.gender});
+  const CostumePage({super.key, required this.role, required this.dance, required this.gender});
 
   @override
   State<CostumePage> createState() => _CostumePageState();
@@ -17,6 +18,7 @@ class CostumePage extends StatefulWidget {
 class _CostumePageState extends State<CostumePage> {
   late Dances dance;
   late List<CostumePiece> costumeList;
+  bool isAdmin = true;
 
   @override
   void initState() {
@@ -136,10 +138,10 @@ class _CostumePageState extends State<CostumePage> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: isAdmin ? FloatingActionButton(
         onPressed: () => _addOrEditCostume(),
         child: const Icon(Icons.add),
-      ),
+      ) : null,
     );
   }
 }

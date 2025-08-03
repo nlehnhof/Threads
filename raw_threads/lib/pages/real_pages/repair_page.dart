@@ -7,7 +7,8 @@ import 'package:raw_threads/pages/repair_builds/repair_summary_page.dart';
 import 'package:raw_threads/sidebar/sidebar.dart';
 
 class RepairPage extends StatefulWidget {
-  const RepairPage({super.key});
+  final String role;
+  const RepairPage(this.role, {super.key});
 
   @override
   State<RepairPage> createState() => _RepairPageState();
@@ -16,6 +17,7 @@ class RepairPage extends StatefulWidget {
 class _RepairPageState extends State<RepairPage> {
   List<Map<String, dynamic>> pendingRepairs = [];
   List<Map<String, dynamic>> completedRepairs = [];
+  bool get isAdmin => widget.role == 'admin';
 
   @override
   void initState() {
@@ -91,7 +93,7 @@ class _RepairPageState extends State<RepairPage> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => RepairSelectionPage()),
+                MaterialPageRoute(builder: (_) => RepairSelectionPage(widget.role)),
               ).then((_) => loadRepairs()); // Refresh after returning
             },
             child: const Text('Start Repair'),
@@ -101,13 +103,12 @@ class _RepairPageState extends State<RepairPage> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const IssueMenuPage()),
+                MaterialPageRoute(builder: (_) => IssueMenuPage(role: widget.role)),
               );
             },
             child: const Text('Issue Menu'),
           ),
           const Divider(),
-
           // Pending Repairs Section
           const Padding(
             padding: EdgeInsets.all(8.0),
@@ -121,15 +122,17 @@ class _RepairPageState extends State<RepairPage> {
                 return ListTile(
                   title: Text('${entry['danceTitle']} - ${entry['costumeTitle']}'),
                   subtitle: Text('Submitted by: ${entry['name']}'),
-                  trailing: ElevatedButton(
+                
+                  trailing: isAdmin ? ElevatedButton(
                     onPressed: () => markAsCompleted(entry),
                     child: const Text('Completed'),
-                  ),
+                  ) : null,
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => RepairSummaryPage(
+                          role: widget.role,
                           danceTitle: entry['danceTitle'],
                           costumeTitle: entry['costumeTitle'],
                         ),
@@ -163,6 +166,7 @@ class _RepairPageState extends State<RepairPage> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => RepairSummaryPage(
+                            role: widget.role,
                             danceTitle: entry['danceTitle'],
                             costumeTitle: entry['costumeTitle'],
                           ),
