@@ -41,7 +41,7 @@ class _NewShowState extends State<NewShow> {
     _dressController = TextEditingController(
       text: widget.existingShow?.dress ?? '',
     );
-    _selectedCategory = widget.existingShow?.category ?? Category.IFDE;
+    _selectedCategory = widget.existingShow?.category ?? Category.ifde;
   }
 
   void _submitShowData() {

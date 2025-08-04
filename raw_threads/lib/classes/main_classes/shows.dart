@@ -3,16 +3,16 @@ import 'package:flutter/material.dart';
 
 const uuid = Uuid();
 
-enum Category { IFDE, Traditionz, TierII, TwoPM, TenAM, NineAM, All }
+enum Category { ifde, traditionz, tierII, twoPM, tenAM, nineAM, all}
 
 const categoryIcons = {
-  Category.IFDE: Icons.dangerous,
-  Category.Traditionz: Icons.holiday_village,
-  Category.TierII: Icons.hourglass_bottom_outlined,
-  Category.TwoPM: Icons.deck,
-  Category.TenAM: Icons.lock_clock,
-  Category.NineAM: Icons.newspaper,
-  Category.All: Icons.disc_full,
+  Category.ifde: Icons.dangerous,
+  Category.traditionz: Icons.holiday_village,
+  Category.tierII: Icons.hourglass_bottom_outlined,
+  Category.twoPM: Icons.deck,
+  Category.tenAM: Icons.lock_clock,
+  Category.nineAM: Icons.newspaper,
+  Category.all: Icons.disc_full,
 };
 class Shows {
   Shows({

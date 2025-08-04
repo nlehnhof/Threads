@@ -47,7 +47,7 @@ class _HomePageState extends State<HomePage> {
     final prefs = await SharedPreferences.getInstance();
     final showsString = prefs.getString('shows');
     if (showsString == null) return;
-
+    final localContext = context;
     try {
       final List<dynamic> decoded = jsonDecode(showsString);
       final allShows = decoded.map((json) => Shows.fromJson(json)).toList();
@@ -57,7 +57,11 @@ class _HomePageState extends State<HomePage> {
         _shows.addAll(allShows);
       });
     } catch (e) {
-      print('Error decoding shows: $e');
+      if (!localContext.mounted) return;
+      // Handle the error, e.g., show a message or log it
+      ScaffoldMessenger.of(localContext).showSnackBar(
+        SnackBar(content: Text('Failed to load shows: $e')),
+      );
     }
   }
 

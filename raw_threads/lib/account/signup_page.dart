@@ -89,6 +89,9 @@ class _SignUpPageState extends State<SignUpPage> {
                 color: myColors.primary,
                 color2: myColors.secondary,
                 onPressed: () async {
+
+                  final localContext = context;
+
                   try {
                     String selectedRole = isSelected[0] ? 'user' : 'admin';
 
@@ -100,9 +103,11 @@ class _SignUpPageState extends State<SignUpPage> {
                     await authService.value.updateUsername(
                       username: _usernameController.text,
                     );
-                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomePage(role: selectedRole)));
+
+                    if (!localContext.mounted) return;  
+                    Navigator.pushReplacement(localContext, MaterialPageRoute(builder: (_) => HomePage(role: selectedRole)));
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                    ScaffoldMessenger.of(localContext).showSnackBar(SnackBar(content: Text('Error: $e')));
                   }
                 },
               ),

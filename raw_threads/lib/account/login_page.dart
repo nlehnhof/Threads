@@ -66,6 +66,7 @@ class _LoginPageState extends State<LoginPage> {
                       color: myColors.primary,
                       color2: myColors.secondary,
                       onPressed: () async {
+                        final localContext = context;
                         setState(() {
                           isLoading = true;
                         });
@@ -75,19 +76,24 @@ class _LoginPageState extends State<LoginPage> {
                             password: _passwordController.text,
                           );
                           String? role = await AuthService().getRole();
+                          
+                          if (!localContext.mounted) return;
+
                           if (role == 'admin') {
-                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePage(role: 'admin')));
+                            Navigator.pushReplacement(localContext, MaterialPageRoute(builder: (_) => const HomePage(role: 'admin')));
                           } else if (role == 'user') {
-                            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomePage(role: 'user')));
+                            Navigator.pushReplacement(localContext, MaterialPageRoute(builder: (_) => const HomePage(role: 'user')));
                           } else {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Role not recognized')));
+                            ScaffoldMessenger.of(localContext).showSnackBar(const SnackBar(content: Text('Role not recognized')));
                           }
                         } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                          ScaffoldMessenger.of(localContext).showSnackBar(SnackBar(content: Text('Error: $e')));
                         } finally {
-                          setState(() {
-                            isLoading = false;
-                          });
+                          if (mounted) {
+                            setState(() {
+                              isLoading = false;
+                           });
+                          }
                         }
                       },
                     ),

@@ -58,13 +58,16 @@ class _IssueMenuPageState extends State<IssueMenuPage> {
       ),
     );
 
-    if (source == null) return;
-
+    final localContext = context;
+    if (source == null || !localContext.mounted) return;
+    
     final picked = await picker.pickImage(source: source);
     if (picked == null) return;
 
+    if (!localContext.mounted) return;
+
     final title = await showDialog<String>(
-      context: context,
+      context: localContext,
       builder: (_) => AlertDialog(
         title: const Text("Enter Issue Title"),
         content: TextField(controller: _titleController),

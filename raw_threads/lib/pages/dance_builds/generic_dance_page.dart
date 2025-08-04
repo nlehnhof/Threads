@@ -79,6 +79,7 @@ class _GenericDancePageState extends State<GenericDancePage> {
                           Navigator.of(context).pop(); // Close dialog
                           await DanceInventoryService.instance.delete(dance.id); // Delete from storage
                             onDelete(dance); // Update parent UI
+                          if (!context.mounted) return;
                           Navigator.of(context).pop(); // Close this page
                         },
                         child: const Text('Delete', style: TextStyle(color: Colors.red)),
@@ -89,10 +90,7 @@ class _GenericDancePageState extends State<GenericDancePage> {
               },
             ),
             TextButton(
-              onPressed: () {
-                // TODO: Implement edit dance functionality here
-                // You might show a dialog or navigate to an edit page
-              },
+              onPressed: () {},
               child: const Text(
                 'Edit',
                 style: TextStyle(
