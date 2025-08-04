@@ -26,6 +26,7 @@ class ShowItem extends StatefulWidget {
 class _ShowItemState extends State<ShowItem> {
   late Shows _show;
   bool isExpanded = false;
+  List<mydances.Dances> loadedDances = [];
 
   @override
   void initState() {
@@ -35,6 +36,7 @@ class _ShowItemState extends State<ShowItem> {
 
   @override
   Widget build(BuildContext context) {
+    final allDances = widget.allDances;
     return Card(
       elevation: 2,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -150,9 +152,12 @@ class _ShowItemState extends State<ShowItem> {
                   if (_show.danceIds.isEmpty)
                     const Text('No dances assigned.', style: TextStyle(fontSize: 14, fontFamily: 'Vogun'),
                   )
+                  else if (allDances.isEmpty)
+                    const Text('No dances available.', style: TextStyle(fontSize: 14, fontFamily: 'Vogun'),
+                  )
                   else ..._show.danceIds.map((danceId) {
-                    final match = widget.allDances.firstWhereOrNull((dance) => dance.id == danceId);
-                    return Text(match?.title ?? 'Unknown Dance', style: TextStyle(fontSize: 14, fontFamily: 'Vogun'));
+                    final match = allDances.firstWhereOrNull((dance) => dance.id.trim() == danceId.trim());
+                    return Text(match?.title ?? 'Unknown Dance', style: const TextStyle(fontSize: 14, fontFamily: 'Vogun'));
                     }),
                 ],
               ),

@@ -6,8 +6,9 @@ import 'package:raw_threads/classes/main_classes/costume_piece.dart'; // Ensure 
 class AddEditCostumeDialog extends StatefulWidget {
   final CostumePiece? existing;
   final bool allowDelete;
+  final String? role;
 
-  const AddEditCostumeDialog({super.key, this.existing, this.allowDelete = false});
+  const AddEditCostumeDialog({super.key, required this.role, this.existing, this.allowDelete = false});
 
   @override
   State<AddEditCostumeDialog> createState() => _AddEditCostumeDialogState();

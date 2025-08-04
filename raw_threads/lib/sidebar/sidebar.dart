@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:raw_threads/sidebar/sidebar_item.dart';
+import 'package:raw_threads/pages/real_pages/home_page.dart'; 
+import 'package:raw_threads/pages/real_pages/new_inv_page.dart';
+import 'package:raw_threads/pages/real_pages/repair_page.dart';
 
 class Sidebar extends StatelessWidget {
-  const Sidebar({super.key});
+  final String role;
+  const Sidebar({super.key, required this.role});
 
   @override
   Widget build(BuildContext context) {
@@ -32,10 +37,9 @@ class Sidebar extends StatelessWidget {
 
             // Top section: Home, Inventory, Repairs, Teams, Chats (with 16 height spacing)
             ...[
-              // SidebarItem(destinationBuilder: () => HomePage(currentUser: currentUser), label: 'Home'),
-              // SidebarItem(destinationBuilder: () => DanceInventoryPage(currentUser: currentUser), label: 'Dance Inventory'),
-              // SidebarItem(destinationBuilder: () => RepairPage(currentUser: currentUser), label: 'Repairs'),
-              // SidebarItem(destinationBuilder: () => TeamsPage(currentUser: currentUser), label: 'Teams'),
+              SidebarItem(destinationBuilder: () => HomePage(role: role), label: 'Home'),
+              SidebarItem(destinationBuilder: () => DanceInventoryPage(role: role), label: 'Dance Inventory'),
+              SidebarItem(destinationBuilder: () => RepairPage(role), label: 'Repairs'),
             ].expand((item) => [
               item,
               const SizedBox(height: 10), // 16px space between items

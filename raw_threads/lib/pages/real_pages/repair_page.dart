@@ -85,7 +85,7 @@ class _RepairPageState extends State<RepairPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Repair Page')),
-      endDrawer: Sidebar(),
+      endDrawer: Sidebar(role: widget.role),
       body: Column(
         children: [
           const SizedBox(height: 20),

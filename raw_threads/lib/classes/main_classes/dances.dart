@@ -32,6 +32,35 @@ class Dances {
   List<CostumePiece> costumesWomen;
   final String? ownerUsername; // added ownerUsername
 
+  Dances copyWith({
+    String? id,
+    String? title,
+    String? country,
+    int? available,
+    int? total,
+    Category? category,
+    String? leftImagePath,
+    String? rightImagePath,
+    List<CostumePiece>? costumesMen,
+    List<CostumePiece>? costumesWomen,
+    String? ownerUsername, // allow copying ownerUsername
+  }) {
+    return Dances(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      country: country ?? this.country,
+      available: available ?? this.available,
+      total: total ?? this.total,
+      category: category ?? this.category,
+      leftImagePath: leftImagePath ?? this.leftImagePath,
+      rightImagePath: rightImagePath ?? this.rightImagePath,
+      // other fields...
+      costumesMen: costumesMen ?? List.from(this.costumesMen),
+      costumesWomen: costumesWomen ?? List.from(this.costumesWomen),  
+      ownerUsername: ownerUsername ?? this.ownerUsername,
+    );
+  }
+
   // Convert to Map including costumes and ownerUsername
   Map<String, dynamic> toJson() {
     return {

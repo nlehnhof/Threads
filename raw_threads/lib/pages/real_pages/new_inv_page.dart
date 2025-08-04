@@ -28,7 +28,11 @@ class _DanceInventoryPageState extends State<DanceInventoryPage> {
 
   void _addDance(Dances dance) async {
     await _danceService.add(dance);
-    setState(() {});
+    final role = widget.role;
+    setState(() {
+      _danceService.dances.add(dance);
+      _danceService.save();
+    });
   }
 
   void _deleteDance(Dances dance) async {

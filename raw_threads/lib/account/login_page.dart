@@ -44,16 +44,58 @@ class _LoginPageState extends State<LoginPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Text('Login', style: TextStyle(fontSize: 48, color: myColors.primary)),
+            Text('Login', style: TextStyle(fontSize: 48, color: myColors.secondary, fontFamily: 'Vogun', fontWeight: FontWeight.w500)),
             const SizedBox(height: 20),
             TextField(
               controller: _emailController,
-              decoration: const InputDecoration(labelText: 'Email'),
+              style: TextStyle(
+                color: myColors.secondary, 
+                backgroundColor: myColors.primary,
+                ),
+              decoration: InputDecoration(
+                labelText: 'Email', 
+                labelStyle: TextStyle(color: myColors.secondary),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0), 
+                  borderSide: BorderSide(
+                    color: myColors.secondary, 
+                    width: 2,
+                    ),
+                  ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                  borderSide: BorderSide(
+                    color: myColors.secondary, 
+                    width: 2,
+                    ),
+                  ), 
+              ),
             ),
             const SizedBox(height: 20),
             TextField(
               controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'Password'),
+              style: TextStyle(
+                color: myColors.secondary, 
+                backgroundColor: myColors.primary,
+                ),
+              decoration: InputDecoration(
+                labelText: 'Password', 
+                labelStyle: TextStyle(color: myColors.secondary),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0), 
+                  borderSide: BorderSide(
+                    color: myColors.secondary, 
+                    width: 2,
+                    ),
+                  ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                  borderSide: BorderSide(
+                    color: myColors.secondary, 
+                    width: 2,
+                    ),
+                  ), 
+              ),
               obscureText: true,
             ),
             const SizedBox(height: 20),
@@ -63,8 +105,8 @@ class _LoginPageState extends State<LoginPage> {
                   ? const CircularProgressIndicator()
                   : PrimaryButton(
                       label: 'Login',
-                      color: myColors.primary,
-                      color2: myColors.secondary,
+                      color: myColors.secondary,
+                      color2: myColors.primary,
                       onPressed: () async {
                         final localContext = context;
                         setState(() {

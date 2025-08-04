@@ -8,6 +8,7 @@ import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/classes/main_classes/shows.dart';
 import 'package:raw_threads/classes/style_classes/primary_button.dart';
 import 'package:raw_threads/services/dance_inventory_service.dart';
+import 'package:raw_threads/classes/style_classes/my_colors.dart';
 
 class HomePage extends StatefulWidget {
   final String role;
@@ -36,11 +37,6 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       allDances = dances;
     });
-
-    //   allDances = widget.currentUser.role == UserRole.admin
-    //       ? dances
-    //       : dances.where((d) => d.ownerUsername == widget.currentUser.adminUsername).toList();
-    // });
   }
 
   Future<void> _loadShows() async {
@@ -132,16 +128,26 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: const Color(0xFFEBEFEE),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFEBEFEE),
-        title: const Text(
-          "Threadline",
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontFamily: 'Vogun',
-            fontWeight: FontWeight.bold,
-          ),
+        backgroundColor: myColors.primary,
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/threadline_logo.png',
+              height: 30,
+            ),
+            Text(
+              "Threadline",
+              style: TextStyle(
+                color: myColors.secondary,
+                fontSize: 16,
+                fontFamily: 'Vogun',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
+        centerTitle: false,
+        elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           Builder(
@@ -152,7 +158,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      endDrawer: Sidebar(),
+      endDrawer: Sidebar(role: widget.role),
       body: SafeArea(
         child: Column(
           children: [

@@ -8,8 +8,9 @@ final uuid = Uuid();
 
 class AddGenericDialog extends StatefulWidget {
   final Function(Dances) onSubmit;
+  final Dances? dance;
 
-  const AddGenericDialog({super.key, required this.onSubmit});
+  const AddGenericDialog({super.key, required this.onSubmit, this.dance});
 
   @override
   State<AddGenericDialog> createState() => _AddGenericDialogState();
@@ -28,10 +29,24 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
   @override
   void initState() {
     super.initState();
-    titleController.addListener(() => setState(() {}));
-    totalController.addListener(() => setState(() {}));
-    availableController.addListener(() => setState(() {}));
-    countryController.addListener(() => setState(() {}));
+    if (widget.dance != null) {
+      final dance = widget.dance!;
+      titleController.text = dance.title;
+      totalController.text = dance.total.toString();
+      availableController.text = dance.available.toString();
+      countryController.text = dance.country;
+      regionController.text = '';
+      selectedLeftImage = dance.leftImagePath != null ? File(dance.leftImagePath!) : null;
+      selectedRightImage = dance.rightImagePath != null ? File(dance.rightImagePath!) : null;
+    } else {
+      titleController.text = '';
+      totalController.text = '';
+      availableController.text = '';
+      countryController.text = '';
+      regionController.text = '';
+      selectedLeftImage = null;
+      selectedRightImage = null;
+    }
   }
 
   @override
@@ -63,8 +78,6 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
         totalController.text.trim().isNotEmpty &&
         availableController.text.trim().isNotEmpty &&
         countryController.text.trim().isNotEmpty;
-    // Debug print — remove after testing:
-    // print('isFormValid: $valid');
     return valid;
   }
 
@@ -228,18 +241,27 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
                 child: ElevatedButton(
                   onPressed: isFormValid
                       ? () {
-                          final newDance = Dances(
-                            id: uuid.v4(),
-                            title: titleController.text.trim(),
-                            country: countryController.text.trim(),
-                            available: int.tryParse(availableController.text.trim()) ?? 0,
-                            total: int.tryParse(totalController.text.trim()) ?? 0,
-                            category: Category.prepped,
-                            leftImagePath: selectedLeftImage?.path,
-                            rightImagePath: selectedRightImage?.path,
-                          );
+                          final danceToSave = widget.dance != null
+                            ? widget.dance!.copyWith(
+                                title: titleController.text.trim(),
+                                country: countryController.text.trim(),
+                                available: int.tryParse(availableController.text.trim()) ?? 0,
+                                total: int.tryParse(totalController.text.trim()) ?? 0,
+                                leftImagePath: selectedLeftImage?.path,
+                                rightImagePath: selectedRightImage?.path,
+                              )
+                            : Dances(
+                              id: uuid.v4(),
+                              title: titleController.text.trim(),
+                              country: countryController.text.trim(),
+                              available: int.tryParse(availableController.text.trim()) ?? 0,
+                              total: int.tryParse(totalController.text.trim()) ?? 0,
+                              category: Category.prepped,
+                              leftImagePath: selectedLeftImage?.path,
+                              rightImagePath: selectedRightImage?.path,
+                            );
                           Navigator.pop(context);
-                          widget.onSubmit(newDance);
+                          widget.onSubmit(danceToSave);
                         }
                       : null,
                   style: ElevatedButton.styleFrom(

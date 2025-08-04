@@ -16,15 +16,14 @@ class CostumePage extends StatefulWidget {
 }
 
 class _CostumePageState extends State<CostumePage> {
-  late Dances dance;
-  late List<CostumePiece> costumeList;
-  bool isAdmin = true;
+  bool get isAdmin => widget.role == 'admin';
+  List<CostumePiece> get costumeList => widget.gender == 'Men'
+    ? widget.dance.costumesMen
+    : widget.dance.costumesWomen;
 
   @override
   void initState() {
     super.initState();
-    dance = widget.dance;
-    costumeList = widget.gender == 'Men' ? dance.costumesMen : dance.costumesWomen;
   }
 
   Future<void> _addOrEditCostume({CostumePiece? existing, int? index}) async {
@@ -33,37 +32,89 @@ class _CostumePageState extends State<CostumePage> {
       builder: (_) => AddEditCostumeDialog(
         existing: existing,
         allowDelete: existing != null,
+        role: widget.role,
       ),
     );
 
     if (result == null && index != null) {
       // Delete
       setState(() {
-        costumeList.removeAt(index);
+        if (widget.gender == 'Men') {
+          widget.dance.costumesMen = List.from(widget.dance.costumesMen)..removeAt(index);
+        } else {
+          widget.dance.costumesWomen = List.from(widget.dance.costumesWomen)..removeAt(index);
+        }
       });
     } else if (result != null) {
       setState(() {
         if (index != null) {
-          costumeList[index] = result;
+          if (widget.gender == 'Men') {
+            final newList = List<CostumePiece>.from(widget.dance.costumesMen);
+            newList[index] = result;
+            widget.dance.costumesMen = newList;
+          } else {
+            final newList = List<CostumePiece>.from(widget.dance.costumesWomen);
+            newList[index] = result;
+            widget.dance.costumesWomen = newList;
+          }
         } else {
-          costumeList.add(result);
+          if (widget.gender == 'Men') {
+            widget.dance.costumesMen = List.from(widget.dance.costumesMen)..add(result);
+          } else {
+            widget.dance.costumesWomen = List.from(widget.dance.costumesWomen)..add(result);
+          }
         }
       });
     }
 
-    // Update dance object and save
-    if (widget.gender == 'Men') {
-      dance.costumesMen = costumeList;
-    } else {
-      dance.costumesWomen = costumeList;
+    // Save the updated dance object
+    await DanceInventoryService.instance.update(widget.dance);
     }
 
-    await DanceInventoryService.instance.update(dance);
-  }
+
+  Future<void> _viewCostume(CostumePiece piece) async {
+  await showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: Text(piece.title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (piece.image != null)
+            Image.file(piece.image!, height: 150)
+          else
+            const Icon(Icons.image, size: 50),
+          const SizedBox(height: 10),
+          Text("Care: ${piece.care ?? 'N/A'}"),
+          Text("Clean Up: ${piece.cleanUp ?? 'N/A'}"),
+          const SizedBox(height: 10),
+          Text("Turn In: ${piece.turnIn ?? 'N/A'}"),
+          const SizedBox(height: 10),
+          Text("Available: ${piece.available}"),
+          Text("Total: ${piece.total}"),
+
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Close"),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildCostumeCard(CostumePiece piece, int index) {
     return GestureDetector(
-      onTap: () => _addOrEditCostume(existing: piece, index: index),
+      onTap: () {
+        if (isAdmin) {
+          _addOrEditCostume(existing: piece, index: index);
+        } else {
+          _viewCostume(piece);
+        }
+      },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

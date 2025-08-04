@@ -4,6 +4,7 @@ import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/pages/costume_builds/costume_page.dart';
 import 'package:raw_threads/services/dance_inventory_service.dart'; // ✅ Import your service
+import 'package:raw_threads/pages/dance_builds/add_generic_dialog.dart';
 
 class GenericDancePage extends StatefulWidget {
   final String role;
@@ -13,8 +14,8 @@ class GenericDancePage extends StatefulWidget {
   const GenericDancePage({
     super.key,
     required this.role,
-    required this.dance,
     required this.onDelete,
+    required this.dance,
   });
 
   @override
@@ -22,10 +23,14 @@ class GenericDancePage extends StatefulWidget {
 }
 
 class _GenericDancePageState extends State<GenericDancePage> {
-  late String role;
-  late Dances dance; 
-  late void Function(Dances) onDelete;
-  bool isAdmin = true;
+  late Dances dance;
+  bool get isAdmin => widget.role == 'admin';
+
+  @override
+  void initState() {
+    super.initState();
+    dance = widget.dance; // Initialize dance from widget
+  }
 
   ImageProvider? _buildImage(String? path) {
     if (path == null) return null;
@@ -36,15 +41,25 @@ class _GenericDancePageState extends State<GenericDancePage> {
     }
   }
 
+  void _editDancePage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddGenericDialog(
+          dance: dance,
+          onSubmit: (updatedDance) async {
+            await DanceInventoryService.instance.update(updatedDance);
+            setState(() {
+              dance = updatedDance; // Update local state
+            });
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    
-    if (role == 'admin') {
-      isAdmin;
-    } else {
-      isAdmin = false;
-    }
-
     return Scaffold(
       backgroundColor: myColors.secondary,
       appBar: AppBar(
@@ -78,7 +93,7 @@ class _GenericDancePageState extends State<GenericDancePage> {
                         onPressed: () async {
                           Navigator.of(context).pop(); // Close dialog
                           await DanceInventoryService.instance.delete(dance.id); // Delete from storage
-                            onDelete(dance); // Update parent UI
+                          widget.onDelete(dance); // Update parent UI
                           if (!context.mounted) return;
                           Navigator.of(context).pop(); // Close this page
                         },
@@ -89,17 +104,18 @@ class _GenericDancePageState extends State<GenericDancePage> {
                 );
               },
             ),
-            TextButton(
-              onPressed: () {},
-              child: const Text(
-                'Edit',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 17,
-                  fontFamily: 'Raleway',
+            if (isAdmin)
+              TextButton(
+                onPressed: _editDancePage,
+                child: const Text(
+                  'Edit',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 17,
+                    fontFamily: 'Raleway',
+                  ),
                 ),
               ),
-            ),
           ],
       ),
       body: Padding(
@@ -119,8 +135,6 @@ class _GenericDancePageState extends State<GenericDancePage> {
             _buildInfoText(dance.title, fontSize: 22, isBold: true),
             const SizedBox(height: 4),
             _buildInfoText(dance.country),
-            const SizedBox(height: 4),
-            _buildInfoText(dance.category.name),
             const SizedBox(height: 24),
             _buildButton(context, 'Men'),
             const SizedBox(height: 12),
@@ -195,7 +209,7 @@ class _GenericDancePageState extends State<GenericDancePage> {
             context,
             MaterialPageRoute(
               builder: (_) => CostumePage(
-                role: role,
+                role: widget.role,
                 dance: dance,
                 gender: label,
               ),
