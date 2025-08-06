@@ -1,58 +1,55 @@
-import 'dart:io';
+import 'package:uuid/uuid.dart';
+
+const uuid = Uuid();
 
 class CostumePiece {
-  String title;
-  String cleanUp;
-  String care;
-  String turnIn;
-  String available;
-  String total;
-  File? image; // Nullable because might not always have an image
+  final String id;
+  final String title;
+  final String care;
+  final String turnIn;
+  final int available;
+  final int total;
+  final String? imagePath; // Local file path to image
 
   CostumePiece({
+    required this.id,
     required this.title,
-    required this.cleanUp,
     required this.care,
     required this.turnIn,
     required this.available,
     required this.total,
-    this.image,
+    this.imagePath,
   });
 
-  // Convert to Map including image path string (if available)
-  Map<String, String> toMap() {
-    return {
-      'title': title,
-      'cleanUp': cleanUp,
-      'care': care,
-      'turnIn': turnIn,
-      'available': available,
-      'total': total,
-      'imagePath': image?.path ?? '',
-    };
-  }
-
-  // Create from Map, reconstructing File from path if available
-  factory CostumePiece.fromMap(Map<String, dynamic> map) {
-    final imagePath = map['imagePath'] as String?;
+  factory CostumePiece.fromJson(Map<String, dynamic> json) {
     return CostumePiece(
-      title: map['title'] ?? '',
-      cleanUp: map['cleanUp'] ?? '',
-      care: map['care'] ?? '',
-      turnIn: map['turnIn'] ?? '',
-      available: map['available'] ?? '',
-      total: map['total'] ?? '',
-      image: (imagePath != null && imagePath.isNotEmpty) ? File(imagePath) : null,
+      id: json['id'],
+      title: json['title'],
+      care: json['care'] as String? ?? '',
+      turnIn: json['turnIn'] as String? ?? '',
+      available: json['available'] is int ? json['available'] : int.tryParse(json['available'] ?? ''),
+      total: json['total'] is int ? json['total'] : int.tryParse(json['total'] ?? ''),
+      imagePath: json['imagePath'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'care': care,
+        'turnIn': turnIn,
+        'available': available,
+        'total': total,
+        'imagePath': imagePath,
+      };
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is CostumePiece &&
           runtimeType == other.runtimeType &&
-          title == other.title;
+          id == other.id;
 
   @override
-  int get hashCode => title.hashCode;
+  int get hashCode => id.hashCode;
 }

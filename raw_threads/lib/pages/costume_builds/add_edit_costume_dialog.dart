@@ -1,82 +1,129 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:raw_threads/classes/main_classes/costume_piece.dart'; // Ensure this exists
+
+import 'package:raw_threads/classes/main_classes/costume_piece.dart';
+import 'package:uuid/uuid.dart';
 
 class AddEditCostumeDialog extends StatefulWidget {
   final CostumePiece? existing;
   final bool allowDelete;
-  final String? role;
+  final Function(CostumePiece) onSave;
+  final String role;
 
-  const AddEditCostumeDialog({super.key, required this.role, this.existing, this.allowDelete = false});
+  const AddEditCostumeDialog({
+    super.key,
+    this.existing,
+    required this.allowDelete,
+    required this.onSave,
+    required this.role,
+  });
 
   @override
   State<AddEditCostumeDialog> createState() => _AddEditCostumeDialogState();
 }
 
 class _AddEditCostumeDialogState extends State<AddEditCostumeDialog> {
-  final TextEditingController titleController = TextEditingController();
-  final TextEditingController cleanUpController = TextEditingController();
-  final TextEditingController careController = TextEditingController();
-  final TextEditingController turnInController = TextEditingController();
-  final TextEditingController availableController = TextEditingController();
-  final TextEditingController totalController = TextEditingController();
-  File? image;
+  final ImagePicker _picker = ImagePicker();
+  final uuid = Uuid();
+
+  File? _pickedImageFile;
+  String? _imagePath; // local file path
+
+  late TextEditingController _titleController;
+  late TextEditingController _careController;
+  late TextEditingController _turnInController;
+  late TextEditingController _availableController;
+  late TextEditingController _totalController;
 
   @override
   void initState() {
     super.initState();
-    if (widget.existing != null) {
-      final existing = widget.existing!;
-      titleController.text = existing.title;
-      cleanUpController.text = existing.cleanUp;
-      careController.text = existing.care;
-      turnInController.text = existing.turnIn;
-      availableController.text = existing.available;
-      totalController.text = existing.total;
-      image = existing.image;
-    }
+
+    final existing = widget.existing;
+    _imagePath = existing?.imagePath;
+
+    _titleController = TextEditingController(text: existing?.title ?? '');
+    _careController = TextEditingController(text: existing?.care ?? '');
+    _turnInController = TextEditingController(text: existing?.turnIn ?? '');
+    _availableController = TextEditingController(text: existing?.available.toString());
+    _totalController = TextEditingController(text: existing?.total.toString());
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _careController.dispose();
+    _turnInController.dispose();
+    _availableController.dispose();
+    _totalController.dispose();
+    super.dispose();
   }
 
   Future<void> _pickImage() async {
-    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+    final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
     if (picked != null) {
-      setState(() => image = File(picked.path));
+      setState(() {
+        _pickedImageFile = File(picked.path);
+        _imagePath = picked.path;
+      });
     }
   }
 
-  void _save() {
-    if (titleController.text.trim().isEmpty) return;
-    final piece = CostumePiece(
-      title: titleController.text.trim(),
-      cleanUp: cleanUpController.text.trim(),
-      care: careController.text.trim(),
-      turnIn: turnInController.text.trim(),
-      available: availableController.text.trim(),
-      total: totalController.text.trim(),
-      image: image,
+  void _onSavePressed() {
+    final title = _titleController.text.trim();
+    final care = _careController.text.trim();
+    final turnIn = _turnInController.text.trim();
+    final available = int.tryParse(_availableController.text.trim()) ?? 0;
+    final total = int.tryParse(_totalController.text.trim()) ?? 0;
+
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Title cannot be empty')),
+      );
+      return;
+    }
+
+    if (_imagePath == null || _imagePath!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select an image')),
+      );
+      return;
+    }
+
+    final newPiece = CostumePiece(
+      id: widget.existing?.id ?? uuid.v4(),
+      title: title,
+      care: care,
+      turnIn: turnIn,
+      available: available,
+      total: total,
+      imagePath: _imagePath,
     );
-    Navigator.of(context).pop(piece);
+
+    widget.onSave(newPiece);
+    Navigator.of(context).pop(newPiece);
   }
 
-  void _delete() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Costume?'),
-        content: const Text('Are you sure you want to delete this costume piece?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context)
-              ..pop()
-              ..pop(null),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
+  Widget _buildImageWidget() {
+    if (_pickedImageFile != null) {
+      return Image.file(_pickedImageFile!, height: 150, fit: BoxFit.cover);
+    } else if (_imagePath != null && _imagePath!.isNotEmpty) {
+      final file = File(_imagePath!);
+      if (file.existsSync()) {
+        return Image.file(file, height: 150, fit: BoxFit.cover);
+      }
+    }
+    return _placeholderImage();
+  }
+
+  Widget _placeholderImage() {
+    return Container(
+      height: 150,
+      color: Colors.grey[300],
+      child: const Center(
+        child: Icon(Icons.image, size: 50, color: Colors.grey),
       ),
     );
   }
@@ -84,37 +131,53 @@ class _AddEditCostumeDialogState extends State<AddEditCostumeDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.existing != null ? 'Edit Costume' : 'Add Costume'),
+      title: Text(widget.existing == null ? 'Add Costume Piece' : 'Edit Costume Piece'),
       content: SingleChildScrollView(
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             GestureDetector(
               onTap: _pickImage,
-              child: image != null
-                  ? Image.file(image!, height: 150)
-                  : Container(
-                      height: 150,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.image, size: 50),
-                    ),
+              child: _buildImageWidget(),
             ),
-            TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Title')),
-            TextField(controller: cleanUpController, decoration: const InputDecoration(labelText: 'Clean-up')),
-            TextField(controller: careController, decoration: const InputDecoration(labelText: 'Care')),
-            TextField(controller: turnInController, decoration: const InputDecoration(labelText: 'Turn-in')),
-            TextField(controller: availableController, decoration: const InputDecoration(labelText: 'Available')),
-            TextField(controller: totalController, decoration: const InputDecoration(labelText: 'Total')),
+            const SizedBox(height: 6),
+            const Text('Tap image to select from gallery'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+            TextField(
+              controller: _careController,
+              decoration: const InputDecoration(labelText: 'Care'),
+            ),
+            TextField(
+              controller: _turnInController,
+              decoration: const InputDecoration(labelText: 'Turn In'),
+            ),
+            TextField(
+              controller: _availableController,
+              decoration: const InputDecoration(labelText: 'Available'),
+              keyboardType: TextInputType.number,
+            ),
+            TextField(
+              controller: _totalController,
+              decoration: const InputDecoration(labelText: 'Total'),
+              keyboardType: TextInputType.number,
+            ),
           ],
         ),
       ),
       actions: [
         if (widget.allowDelete)
           TextButton(
-            onPressed: _delete,
+            onPressed: () => Navigator.of(context).pop(null), // signal delete
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        ElevatedButton(onPressed: _save, child: const Text('Save')),
+        TextButton(
+          onPressed: _onSavePressed,
+          child: const Text('Save'),
+        ),
       ],
     );
   }

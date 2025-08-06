@@ -1,15 +1,24 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
-import 'package:raw_threads/services/dance_inventory_service.dart';
 import 'package:raw_threads/pages/costume_builds/add_edit_costume_dialog.dart';
+import 'package:raw_threads/services/costume_inventory_service.dart';
 
 class CostumePage extends StatefulWidget {
   final String role;
   final Dances dance;
   final String gender;
 
-  const CostumePage({super.key, required this.role, required this.dance, required this.gender});
+  const CostumePage({
+    super.key,
+    required this.role,
+    required this.dance,
+    required this.gender,
+  });
 
   @override
   State<CostumePage> createState() => _CostumePageState();
@@ -17,96 +26,139 @@ class CostumePage extends StatefulWidget {
 
 class _CostumePageState extends State<CostumePage> {
   bool get isAdmin => widget.role == 'admin';
-  List<CostumePiece> get costumeList => widget.gender == 'Men'
-    ? widget.dance.costumesMen
-    : widget.dance.costumesWomen;
+
+  List<CostumePiece> costumeList = [];
+  String? danceId;
+  String get genderKey => widget.gender == 'Men' ? 'Men' : 'Women';
+
+  StreamSubscription? _listenerSub;
 
   @override
   void initState() {
     super.initState();
+    _initListeners();
+  }
+
+  Future<void> _initListeners() async {
+    danceId = widget.dance.id;
+
+    if (danceId == null) return;
+
+    // Load cached costumes first
+    await CostumeInventoryService.instance.load(danceId!, genderKey);
+    setState(() {
+      costumeList = CostumeInventoryService.instance.costumes;
+    });
+
+    // Listen for live updates from Firebase and update UI accordingly
+    _listenerSub = await CostumeInventoryService.instance.listenToCostumes(
+      danceId: danceId!,
+      gender: genderKey,
+      onUpdate: (updatedList) {
+        if (!mounted) return;
+        setState(() {
+          costumeList = updatedList;
+        });
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _listenerSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _addOrEditCostume({CostumePiece? existing, int? index}) async {
-    final result = await showDialog<CostumePiece>(
+    final result = await showDialog<CostumePiece?>(
       context: context,
       builder: (_) => AddEditCostumeDialog(
         existing: existing,
         allowDelete: existing != null,
+        onSave: (_) {},
         role: widget.role,
       ),
     );
 
     if (result == null && index != null) {
-      // Delete
-      setState(() {
-        if (widget.gender == 'Men') {
-          widget.dance.costumesMen = List.from(widget.dance.costumesMen)..removeAt(index);
-        } else {
-          widget.dance.costumesWomen = List.from(widget.dance.costumesWomen)..removeAt(index);
-        }
-      });
+      // Delete costume
+      if (danceId != null) {
+        await CostumeInventoryService.instance.delete(danceId!, genderKey, costumeList[index].id);
+      }
     } else if (result != null) {
-      setState(() {
-        if (index != null) {
-          if (widget.gender == 'Men') {
-            final newList = List<CostumePiece>.from(widget.dance.costumesMen);
-            newList[index] = result;
-            widget.dance.costumesMen = newList;
-          } else {
-            final newList = List<CostumePiece>.from(widget.dance.costumesWomen);
-            newList[index] = result;
-            widget.dance.costumesWomen = newList;
-          }
-        } else {
-          if (widget.gender == 'Men') {
-            widget.dance.costumesMen = List.from(widget.dance.costumesMen)..add(result);
-          } else {
-            widget.dance.costumesWomen = List.from(widget.dance.costumesWomen)..add(result);
-          }
-        }
-      });
-    }
+      if (danceId == null) return;
 
-    // Save the updated dance object
-    await DanceInventoryService.instance.update(widget.dance);
+      if (index != null) {
+        // Update existing costume
+        await CostumeInventoryService.instance.update(danceId!, genderKey, result);
+      } else {
+        // Add new costume
+        await CostumeInventoryService.instance.add(danceId!, genderKey, result);
+      }
     }
-
+  }
 
   Future<void> _viewCostume(CostumePiece piece) async {
-  await showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: Text(piece.title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (piece.image != null)
-            Image.file(piece.image!, height: 150)
-          else
-            const Icon(Icons.image, size: 50),
-          const SizedBox(height: 10),
-          Text("Care: ${piece.care ?? 'N/A'}"),
-          Text("Clean Up: ${piece.cleanUp ?? 'N/A'}"),
-          const SizedBox(height: 10),
-          Text("Turn In: ${piece.turnIn ?? 'N/A'}"),
-          const SizedBox(height: 10),
-          Text("Available: ${piece.available}"),
-          Text("Total: ${piece.total}"),
+    Widget imageWidget;
+    if (piece.imagePath != null && piece.imagePath!.isNotEmpty) {
+      final file = File(piece.imagePath!);
+      if (file.existsSync()) {
+        imageWidget = Image.file(file, height: 150, fit: BoxFit.cover);
+      } else {
+        imageWidget = _placeholderImage();
+      }
+    } else {
+      imageWidget = _placeholderImage();
+    }
 
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(piece.title),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              imageWidget,
+              const SizedBox(height: 10),
+              Text("Care: ${piece.care}"),
+              const SizedBox(height: 10),
+              Text("Turn In: ${piece.turnIn}"),
+              const SizedBox(height: 10),
+              Text("Available: ${piece.available}"),
+              Text("Total: ${piece.total}"),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Close"),
+          ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("Close"),
-        ),
-      ],
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildCostumeCard(CostumePiece piece, int index) {
+    Widget imageWidget;
+    if (piece.imagePath != null && piece.imagePath!.isNotEmpty) {
+      final file = File(piece.imagePath!);
+      if (file.existsSync()) {
+        imageWidget = Image.file(
+          file,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: 150,
+        );
+      } else {
+        imageWidget = _placeholderImage();
+      }
+    } else {
+      imageWidget = _placeholderImage();
+    }
+
     return GestureDetector(
       onTap: () {
         if (isAdmin) {
@@ -124,15 +176,7 @@ class _CostumePageState extends State<CostumePage> {
             child: SizedBox(
               height: 150,
               width: double.infinity,
-              child: piece.image != null
-                  ? Image.file(
-                      piece.image!,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _placeholderImage(),
-                    )
-                  : _placeholderImage(),
+              child: imageWidget,
             ),
           ),
           Padding(
@@ -179,20 +223,24 @@ class _CostumePageState extends State<CostumePage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(4),
-        child: GridView.count(
-          crossAxisCount: 2,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          children: List.generate(
-            costumeList.length,
-            (index) => _buildCostumeCard(costumeList[index], index),
-          ),
-        ),
+        child: costumeList.isEmpty
+            ? const Center(child: Text("No costumes found."))
+            : GridView.count(
+                crossAxisCount: 2,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                children: List.generate(
+                  costumeList.length,
+                  (index) => _buildCostumeCard(costumeList[index], index),
+                ),
+              ),
       ),
-      floatingActionButton: isAdmin ? FloatingActionButton(
-        onPressed: () => _addOrEditCostume(),
-        child: const Icon(Icons.add),
-      ) : null,
+      floatingActionButton: isAdmin
+          ? FloatingActionButton(
+              onPressed: () => _addOrEditCostume(),
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 }

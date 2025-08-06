@@ -3,6 +3,7 @@ import 'package:raw_threads/classes/main_classes/shows.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart'; 
 import 'package:raw_threads/pages/show_builds/dance_selection_page.dart';
 import 'package:raw_threads/services/dance_inventory_service.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class DanceStatusAndTeams {
   String status;
@@ -42,6 +43,8 @@ class _EditShowPageState extends State<EditShowPage> {
     _techController = TextEditingController(text: widget.show.tech);
     _dressController = TextEditingController(text: widget.show.dress);
     
+    _loadDanceStatuses();
+
     for (var id in _selectedDanceIds) {
       danceStatusMap[id] = DanceStatusAndTeams(status: 'Not Ready', teams: {});
     }
@@ -61,7 +64,7 @@ class _EditShowPageState extends State<EditShowPage> {
     final result = await Navigator.of(context).push<List<String>>(
       MaterialPageRoute(
         builder: (_) => DanceSelectionPage(
-          allDances: _inventory.dances,
+          adminId: widget.show.adminId,
           initiallySelectedIds: _selectedDanceIds,
         ),
       ),
@@ -78,7 +81,34 @@ class _EditShowPageState extends State<EditShowPage> {
     }
   }
 
-  void _saveShow(BuildContext ctx) {
+  void _loadDanceStatuses() async {
+    final db = FirebaseDatabase.instance.ref();
+    final danceStatusesRef = db.child('shows/${widget.show.adminId}/${widget.show.id}/danceStatuses');
+
+    final snapshot = await danceStatusesRef.get();
+    final statusMap = <String, DanceStatusAndTeams>{};
+
+    if (snapshot.exists) {
+      final data = Map<String, dynamic>.from(snapshot.value as Map);
+      for (final entry in data.entries) {
+        final danceId = entry.key;
+        final value = Map<String, dynamic>.from(entry.value);
+        statusMap[danceId] = DanceStatusAndTeams(
+          status: value['status'] ?? 'Not Ready',
+          teams: Set<String>.from(value['teams'] ?? []),
+        );
+      }
+    }
+
+    setState(() {
+      danceStatusMap.addAll(statusMap);
+      for (var id in _selectedDanceIds) {
+        danceStatusMap.putIfAbsent(id, () => DanceStatusAndTeams(status: 'Not Ready', teams: {}));
+      }
+    });
+  }
+
+  void _saveShow(BuildContext ctx) async {
     final updatedShow = Shows(
       id: widget.show.id,
       title: _titleController.text,
@@ -88,7 +118,25 @@ class _EditShowPageState extends State<EditShowPage> {
       location: _locationController.text,
       category: widget.show.category,
       danceIds: _selectedDanceIds,
+      adminId: widget.show.adminId,
     );
+
+    final db = FirebaseDatabase.instance.ref();
+    final showRef = db.child('shows/${updatedShow.adminId}/${updatedShow.id}');
+
+    // Save main show info
+    await showRef.set(updatedShow.toJson());
+
+    // Save dance status/teams under 'danceStatuses' child node
+    for (var entry in danceStatusMap.entries) {
+      await showRef
+          .child('danceStatuses/${entry.key}')
+          .set({
+            'status': entry.value.status,
+            'teams': entry.value.teams.toList(),
+          });
+    }
+
     widget.onSave(updatedShow);
     Navigator.of(ctx).pop(updatedShow);
   }

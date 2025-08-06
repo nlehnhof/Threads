@@ -16,20 +16,13 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
   Dances? selectedDance;
   String? selectedGender;
   CostumePiece? selectedCostume;
+
   bool get isAdmin => widget.role == 'admin';
 
   @override
   void initState() {
     super.initState();
-    loadDances();
-  }
-
-  Future<void> loadDances() async {
-    await DanceInventoryService.instance.load();
-    List<Dances> dances = DanceInventoryService.instance.dances;
-    setState(() {
-      dances = dances;
-    });
+    DanceInventoryService.instance.load().then((_) => setState(() {}));
   }
 
   List<CostumePiece> get selectedCostumeList {
@@ -49,7 +42,6 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Dance Dropdown
             DropdownButton<Dances>(
               hint: const Text('Select Dance'),
               value: selectedDance,
@@ -68,8 +60,6 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
               }).toList(),
             ),
             const SizedBox(height: 16),
-
-            // Gender Dropdown
             if (selectedDance != null)
               DropdownButton<String>(
                 hint: const Text('Select Gender'),
@@ -85,10 +75,7 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
                   DropdownMenuItem(value: 'Women', child: Text('Women')),
                 ],
               ),
-
             const SizedBox(height: 16),
-
-            // Costume Dropdown
             if (selectedGender != null)
               selectedCostumeList.isNotEmpty
                   ? DropdownButton<CostumePiece>(
@@ -107,9 +94,7 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
                       }).toList(),
                     )
                   : const Text('No costume pieces available for this gender'),
-
             const Spacer(),
-
             ElevatedButton(
               onPressed: (selectedDance != null &&
                       selectedGender != null &&

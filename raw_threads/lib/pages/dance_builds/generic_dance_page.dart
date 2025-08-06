@@ -5,6 +5,7 @@ import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/pages/costume_builds/costume_page.dart';
 import 'package:raw_threads/services/dance_inventory_service.dart'; // ✅ Import your service
 import 'package:raw_threads/pages/dance_builds/add_generic_dialog.dart';
+import 'dart:async';
 
 class GenericDancePage extends StatefulWidget {
   final String role;
@@ -25,11 +26,30 @@ class GenericDancePage extends StatefulWidget {
 class _GenericDancePageState extends State<GenericDancePage> {
   late Dances dance;
   bool get isAdmin => widget.role == 'admin';
+  StreamSubscription? _danceDetailsSubscription;
 
   @override
   void initState() {
     super.initState();
     dance = widget.dance; // Initialize dance from widget
+    _subscribeToDanceUpdates();
+  }
+
+  Future<void> _subscribeToDanceUpdates() async {
+    _danceDetailsSubscription?.cancel();
+    _danceDetailsSubscription = await DanceInventoryService.instance.listenToDance(dance.id, (updatedDance) {
+      if (mounted) {
+        setState(() {
+          dance = updatedDance;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _danceDetailsSubscription?.cancel();
+    super.dispose();
   }
 
   ImageProvider? _buildImage(String? path) {

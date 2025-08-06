@@ -3,6 +3,8 @@ import 'package:raw_threads/sidebar/sidebar_item.dart';
 import 'package:raw_threads/pages/real_pages/home_page.dart'; 
 import 'package:raw_threads/pages/real_pages/new_inv_page.dart';
 import 'package:raw_threads/pages/real_pages/repair_page.dart';
+import 'package:raw_threads/pages/real_pages/welcome_page.dart'; // Assuming you have a ProfilePage
+import 'package:raw_threads/pages/real_pages/teams_page.dart'; // Assuming you have a TeamPage
 
 class Sidebar extends StatelessWidget {
   final String role;
@@ -40,6 +42,7 @@ class Sidebar extends StatelessWidget {
               SidebarItem(destinationBuilder: () => HomePage(role: role), label: 'Home'),
               SidebarItem(destinationBuilder: () => DanceInventoryPage(role: role), label: 'Dance Inventory'),
               SidebarItem(destinationBuilder: () => RepairPage(role), label: 'Repairs'),
+              SidebarItem(destinationBuilder: () => TeamsPage(), label: 'Teams'),
             ].expand((item) => [
               item,
               const SizedBox(height: 10), // 16px space between items

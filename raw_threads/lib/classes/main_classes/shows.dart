@@ -24,6 +24,7 @@ class Shows {
     required this.tech,
     required this.category,
     required this.danceIds,
+    required this.adminId,
   });
 
   final String id;
@@ -34,6 +35,7 @@ class Shows {
   final String tech;
   final Category category;
   final List<String> danceIds;
+  final String adminId; // new field for admin ID
 
   Map<String, dynamic> toJson() {
     return {
@@ -45,6 +47,7 @@ class Shows {
       'tech': tech,
       'category': category.name,
       'danceIds': danceIds,
+      'adminId': adminId, // include admin ID in JSON
     };
   }
 
@@ -56,6 +59,7 @@ class Shows {
       location: json['location'],
       dress: json['dress'],
       tech: json['tech'],
+      adminId: json['adminId'] ?? '', // handle missing admin I
       category: Category.values.firstWhere((e) => e.name == json['category']),
       danceIds: (json['danceIds'] != null)
           ? List<String>.from(json['danceIds'])

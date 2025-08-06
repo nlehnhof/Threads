@@ -72,8 +72,8 @@ class Dances {
       'category': category.name,
       'leftImagePath': leftImagePath,
       'rightImagePath': rightImagePath,
-      'costumesMen': costumesMen.map((c) => c.toMap()).toList(),
-      'costumesWomen': costumesWomen.map((c) => c.toMap()).toList(),
+      'costumesMen': costumesMen.map((c) => c.toJson()).toList(),
+      'costumesWomen': costumesWomen.map((c) => c.toJson()).toList(),
       'ownerUsername': ownerUsername,
     };
   }
@@ -93,11 +93,11 @@ class Dances {
       leftImagePath: json['leftImagePath'],
       rightImagePath: json['rightImagePath'],
       costumesMen: (json['costumesMen'] as List?)
-              ?.map((c) => CostumePiece.fromMap(c))
+              ?.map((c) => CostumePiece.fromJson(c))
               .toList() ??
           [],
       costumesWomen: (json['costumesWomen'] as List?)
-              ?.map((c) => CostumePiece.fromMap(c))
+              ?.map((c) => CostumePiece.fromJson(c))
               .toList() ??
           [],
       ownerUsername: json['ownerUsername'], // read ownerUsername from json

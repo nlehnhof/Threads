@@ -1,9 +1,12 @@
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/services/dance_inventory_service.dart';
 import 'package:raw_threads/pages/dance_builds/generic_dance_page.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:raw_threads/pages/dance_builds/add_generic_dialog.dart';
+import 'dart:async';
+import 'package:raw_threads/services/auth_service.dart';
 
 class DanceInventoryPage extends StatefulWidget {
   final String role;
@@ -17,6 +20,7 @@ class _DanceInventoryPageState extends State<DanceInventoryPage> {
   final DanceInventoryService _danceService = DanceInventoryService.instance;
   String searchQuery = "";
   bool sortByDance = true;
+  StreamSubscription<DatabaseEvent>? _danceSubscription;
 
   @override
   void initState() {
@@ -24,20 +28,43 @@ class _DanceInventoryPageState extends State<DanceInventoryPage> {
     _danceService.load().then((_) {
       setState(() {});
     });
+    authService.value.getEffectiveAdminId().then((adminId) {
+      if (adminId != null) {
+        _danceSubscription = FirebaseDatabase.instance
+            .ref()
+            .child('admins')
+            .child(adminId)
+            .child('dances')
+            .onValue
+            .listen((event) {
+          _danceService.load().then((_) {
+            if (mounted) {
+              setState(() {});
+          }
+        });
+      });
+      }  
+    });
+  }
+
+  @override
+  void dispose() {
+    _danceSubscription?.cancel();
+    super.dispose();
   }
 
   void _addDance(Dances dance) async {
     await _danceService.add(dance);
-    final role = widget.role;
     setState(() {
-      _danceService.dances.add(dance);
-      _danceService.save();
     });
   }
 
   void _deleteDance(Dances dance) async {
     await _danceService.delete(dance.id);
     setState(() {});
+    if (mounted) {
+    Navigator.pop(context);
+    }
   }
 
   @override

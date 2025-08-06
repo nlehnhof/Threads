@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
 import 'repair_summary_page.dart';
@@ -14,8 +14,7 @@ class RepairDetailsPage extends StatefulWidget {
   final String role;
 
   const RepairDetailsPage(
-    this.role,
-    {
+    this.role, {
     super.key,
     required this.dance,
     required this.costume,
@@ -26,9 +25,13 @@ class RepairDetailsPage extends StatefulWidget {
 }
 
 class _RepairDetailsPageState extends State<RepairDetailsPage> {
+  final _auth = FirebaseAuth.instance;
+  final _dbRef = FirebaseDatabase.instance.ref();
+
+  String? adminId;
+
   List<Map<String, dynamic>> issueOptions = [];
   File? photo;
-  bool get isAdmin => widget.role == 'admin';
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController teamController = TextEditingController();
@@ -36,25 +39,72 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
   final TextEditingController costumeNumberController = TextEditingController();
   final TextEditingController commentController = TextEditingController();
 
+  bool get isAdmin => widget.role == 'admin';
+
   @override
   void initState() {
     super.initState();
-    loadGlobalIssues();
+    _initUserAndLoadData();
+  }
+
+  Future<void> _initUserAndLoadData() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    if (isAdmin) {
+      adminId = user.uid;
+    } else {
+      final adminSnap = await _dbRef.child('users').child(user.uid).child('adminId').get();
+      adminId = adminSnap.exists ? adminSnap.value as String : null;
+    }
+
+    if (adminId != null) {
+      await loadGlobalIssues();
+      await loadRepairData();
+    }
   }
 
   Future<void> loadGlobalIssues() async {
-    final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getString('global_repair_issues');
-    if (stored != null) {
-      final decoded = jsonDecode(stored) as List;
+    if (adminId == null) return;
+    final snapshot = await _dbRef.child('admins').child(adminId!).child('issues').get();
+    if (snapshot.exists) {
+      final data = Map<String, dynamic>.from(snapshot.value as Map);
       setState(() {
-        issueOptions = decoded
-            .map((e) => {
-                  'title': e['title'],
-                  'image': File(e['imagePath']),
-                  'selected': false,
-                })
-            .toList();
+        issueOptions = data.entries.map((entry) {
+          final map = Map<String, dynamic>.from(entry.value);
+          map['selected'] = false;
+          map['image'] = map['imagePath'];
+          return map;
+        }).toList();
+      });
+    } else {
+      setState(() => issueOptions = []);
+    }
+  }
+
+  Future<void> loadRepairData() async {
+    if (adminId == null) return;
+    final key = '${widget.dance.id}_${widget.costume.title}';
+    final snapshot = await _dbRef.child('admins').child(adminId!).child('repairs').child(key).get();
+
+    if (snapshot.exists) {
+      final data = Map<String, dynamic>.from(snapshot.value as Map);
+
+      setState(() {
+        nameController.text = data['name'] ?? '';
+        teamController.text = data['team'] ?? '';
+        emailController.text = data['email'] ?? '';
+        costumeNumberController.text = data['costumeNumbers'] ?? '';
+        commentController.text = data['comments'] ?? '';
+        photo = (data['photoPath'] != null && (data['photoPath'] as String).isNotEmpty)
+            ? File(data['photoPath'])
+            : null;
+
+        // Set selected issues based on saved repair data
+        List<dynamic> savedIssues = data['selectedIssues'] ?? [];
+        for (var issue in issueOptions) {
+          issue['selected'] = savedIssues.any((saved) => saved['title'] == issue['title']);
+        }
       });
     }
   }
@@ -98,27 +148,17 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
       minHeight: 200,
     );
 
-    if (compressedFile == null) return null;
-    return File(compressedFile.path);
+    return compressedFile != null ? File(compressedFile.path) : null;
   }
 
   Future<void> saveRepairData() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    String? thumbPath;
-
-    if (photo != null) {
-      final thumbFile = await compressImage(photo!);
-      if (thumbFile != null) {
-        thumbPath = thumbFile.path;
-      }
-    }
+    if (adminId == null) return;
 
     final selectedIssues = issueOptions
         .where((issue) => issue['selected'] == true)
         .map((issue) => {
               'title': issue['title'],
-              'imagePath': issue['image'].path,
+              'imagePath': issue['image'],
             })
         .toList();
 
@@ -133,17 +173,27 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
       'costumeNumbers': costumeNumberController.text,
       'comments': commentController.text,
       'photoPath': photo?.path ?? '',
-      'thumbnailPath': thumbPath ?? '',
+      // add 'thumbnailPath' here if you generate and want to save thumbnails
     };
 
-    await prefs.setString(
-      'last_repair_${widget.dance.id}_${widget.costume.title}',
-      jsonEncode(repairData),
-    );
+    final key = '${widget.dance.id}_${widget.costume.title}';
+
+    await _dbRef.child('admins').child(adminId!).child('repairs').child(key).set(repairData);
   }
 
   Widget buildIssueCard(Map<String, dynamic> issue, int index) {
     final selected = issue['selected'] == true;
+    final imageSource = issue['image'];
+    Widget imageWidget;
+
+    if (imageSource is String && imageSource.startsWith('http')) {
+      imageWidget = Image.network(imageSource, width: 100, height: 100, fit: BoxFit.cover);
+    } else if (imageSource is String) {
+      imageWidget = Image.file(File(imageSource), width: 100, height: 100, fit: BoxFit.cover);
+    } else {
+      imageWidget = const Icon(Icons.broken_image, size: 100);
+    }
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -155,12 +205,7 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
         children: [
           Opacity(
             opacity: selected ? 0.5 : 1.0,
-            child: Image.file(
-              issue['image'],
-              width: 100,
-              height: 100,
-              fit: BoxFit.cover,
-            ),
+            child: imageWidget,
           ),
           if (selected)
             Container(
@@ -181,6 +226,16 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    teamController.dispose();
+    emailController.dispose();
+    costumeNumberController.dispose();
+    commentController.dispose();
+    super.dispose();
   }
 
   @override

@@ -1,42 +1,110 @@
-import 'dart:convert';
+import 'dart:async';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:raw_threads/classes/main_classes/costume_piece.dart';
+import 'package:raw_threads/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../classes/main_classes/costume_piece.dart';
+import 'package:flutter/material.dart';
+import 'dart:convert';
 
 class CostumeInventoryService {
+  CostumeInventoryService._privateConstructor();
   static final CostumeInventoryService instance = CostumeInventoryService._privateConstructor();
 
-  CostumeInventoryService._privateConstructor();
+  List<CostumePiece> _cachedCostumes = [];
 
-  static const String _prefsKeyPrefix = 'costumes_for_dance_';
+  List<CostumePiece> get costumes => List.unmodifiable(_cachedCostumes);
 
-  final Map<String, List<CostumePiece>> _costumesByDance = {};
+  /// Add a costume to Firebase only
+  Future<void> add(String danceId, String gender, CostumePiece costume) async {
+    final adminId = await authService.value.getEffectiveAdminId();
+    if (adminId == null) return;
 
-  Future<void> loadForDance(String danceId) async {
+    final ref = FirebaseDatabase.instance
+        .ref('admins/$adminId/dances/$danceId/costumes/$gender/${costume.id}');
+
+    await ref.set(costume.toJson());
+
+    print('Costume added: ${costume.title} with id: ${costume.id}');
+
+    final snapshot = await ref.get();
+
+    if (snapshot.exists) {
+      print('Verified costume added: ${snapshot.value}');
+    } else {
+      print('Error: Costume was not found after adding!');
+    }
+    // Do NOT update _cachedCostumes here, the listener will handle it.
+  }
+
+
+
+  Future<void> load(String danceId, String gender) async {
     final prefs = await SharedPreferences.getInstance();
-    final jsonString = prefs.getString('$_prefsKeyPrefix$danceId');
-    if (jsonString == null) {
-      _costumesByDance[danceId] = [];
+    final data = prefs.getString(_getCostumeKey(danceId, gender));
+    if (data == null) {
+      _cachedCostumes = [];
       return;
     }
-    final List<dynamic> jsonList = json.decode(jsonString);
-    _costumesByDance[danceId] = jsonList.map((item) => CostumePiece.fromMap(item)).toList();
+
+    final decoded = json.decode(data);
+    _cachedCostumes = (decoded as List).map((item) => CostumePiece.fromJson(item)).toList();
   }
 
-  List<CostumePiece> getCostumes(String danceId) {
-    return _costumesByDance[danceId] ?? [];
+  String _getCostumeKey(String danceId, String gender) {
+    return 'costumes_${danceId}_$gender';
   }
 
-  Future<void> addCostume(String danceId, CostumePiece piece) async {
-    final list = _costumesByDance[danceId] ?? [];
-    list.add(piece);
-    _costumesByDance[danceId] = list;
-    await saveForDance(danceId);
+  /// Update a costume on Firebase only
+  Future<void> update(String danceId, String gender, CostumePiece updatedCostume) async {
+    final adminId = await authService.value.getEffectiveAdminId();
+    if (adminId == null) return;
+
+    final ref = FirebaseDatabase.instance
+        .ref('admins/$adminId/dances/$danceId/costumes/$gender/${updatedCostume.id}');
+
+    await ref.set(updatedCostume.toJson());
+    // Do NOT update _cachedCostumes here.
   }
 
-  Future<void> saveForDance(String danceId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = _costumesByDance[danceId] ?? [];
-    final jsonString = json.encode(list.map((c) => c.toMap()).toList());
-    await prefs.setString('$_prefsKeyPrefix$danceId', jsonString);
+  /// Delete a costume on Firebase only
+  Future<void> delete(String danceId, String gender, String costumeId) async {
+    final adminId = await authService.value.getEffectiveAdminId();
+    if (adminId == null) return;
+
+    final ref = FirebaseDatabase.instance
+        .ref('admins/$adminId/dances/$danceId/costumes/$gender/$costumeId');
+
+    await ref.remove();
+    // Do NOT update _cachedCostumes here.
+  }
+
+  /// Listen to Firebase updates for costumes under a specific dance and gender
+  Future<StreamSubscription?> listenToCostumes({
+    required String danceId,
+    required String gender,
+    required void Function(List<CostumePiece>) onUpdate,
+  }) async {
+    final adminId = await authService.value.getEffectiveAdminId();
+    if (adminId == null) return null;
+
+    final ref = FirebaseDatabase.instance
+        .ref('admins/$adminId/dances/$danceId/costumes/$gender');
+
+    return ref.onValue.listen((event) {
+      final data = event.snapshot.value;
+
+      if (data is Map) {
+        final costumes = data.entries.map((entry) {
+          final json = Map<String, dynamic>.from(entry.value);
+          return CostumePiece.fromJson(json);
+        }).toList();
+
+        _cachedCostumes = costumes;
+        onUpdate(costumes);
+      } else {
+        _cachedCostumes = [];
+        onUpdate([]);
+      }
+    });
   }
 }

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:raw_threads/pages/repair_builds/issue_menu_page.dart';
 import 'package:raw_threads/pages/repair_builds/repair_selection_page.dart';
 import 'package:raw_threads/pages/repair_builds/repair_summary_page.dart';
 import 'package:raw_threads/sidebar/sidebar.dart';
-
+import 'dart:async';
 class RepairPage extends StatefulWidget {
   final String role;
   const RepairPage(this.role, {super.key});
@@ -15,46 +15,93 @@ class RepairPage extends StatefulWidget {
 }
 
 class _RepairPageState extends State<RepairPage> {
+  final _dbRef = FirebaseDatabase.instance.ref();
+  final _auth = FirebaseAuth.instance;
+
   List<Map<String, dynamic>> pendingRepairs = [];
   List<Map<String, dynamic>> completedRepairs = [];
+
   bool get isAdmin => widget.role == 'admin';
+
+  String? _adminId;
+  StreamSubscription<DatabaseEvent>? _repairListener;
 
   @override
   void initState() {
     super.initState();
-    loadRepairs();
+    _loadAdminIdAndRepairs();
   }
 
-  Future<void> loadRepairs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys().where((k) => k.startsWith('last_repair_'));
+  Future<void> _loadAdminIdAndRepairs() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    if (isAdmin) {
+      _adminId = user.uid;
+    } else {
+      final snapshot = await _dbRef.child('users').child(user.uid).child('adminId').get();
+      if (snapshot.exists) {
+        _adminId = snapshot.value as String?;
+      }
+    }
+
+    if (_adminId != null) {
+      _repairListener =_dbRef.child('repairs').child(_adminId!).onValue.listen((event) {
+       final repairsMapRaw = event.snapshot.value;
+        if (repairsMapRaw is Map) {
+          final pending = <Map<String, dynamic>>[];
+          final completed = <Map<String, dynamic>>[];
+
+          repairsMapRaw.forEach((key, value) {
+            final repair = Map<String, dynamic>.from(value);
+            repair['key'] = key;
+            if (repair['completed'] == true) {
+              completed.add(repair);
+            } else {
+              pending.add(repair);
+            }
+          });
+
+          setState(() {
+            pendingRepairs = pending;
+            completedRepairs = completed;
+          });
+        } else {
+          setState(() {
+            pendingRepairs = [];
+            completedRepairs = [];
+          });
+        }
+    });
+    }
+  }
+
+  @override
+  void dispose() {
+    _repairListener?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadRepairs() async {
+    if (_adminId == null) return;
+
+    final repairsSnapshot = await _dbRef.child('repairs').child(_adminId!).get();
 
     final pending = <Map<String, dynamic>>[];
     final completed = <Map<String, dynamic>>[];
 
-    for (final key in keys) {
-      final jsonStr = prefs.getString(key);
-      if (jsonStr != null) {
-        final data = json.decode(jsonStr);
-        final parts = key.replaceFirst('last_repair_', '').split('_');
-        final danceId = parts.first;
-        final costumeTitle = parts.skip(1).join('_');
+    if (repairsSnapshot.exists) {
+      final repairsMap = Map<String, dynamic>.from(repairsSnapshot.value as Map);
 
-        final entry = {
-          'key': key,
-          'danceId': danceId,
-          'danceTitle': data['danceTitle'] ?? 'Unknown Dance',
-          'costumeTitle': costumeTitle,
-          'name': data['name'] ?? '',
-          'completed': data['completed'] ?? false,
-        };
-
-        if (entry['completed'] == true) {
-          completed.add(entry);
+      repairsMap.forEach((key, value) {
+        final repair = Map<String, dynamic>.from(value);
+        repair['key'] = key;
+        if (repair['completed'] == true) {
+          completed.add(repair);
         } else {
-          pending.add(entry);
+          pending.add(repair);
         }
-      }
+      });
     }
 
     setState(() {
@@ -64,20 +111,18 @@ class _RepairPageState extends State<RepairPage> {
   }
 
   Future<void> markAsCompleted(Map<String, dynamic> entry) async {
-    final prefs = await SharedPreferences.getInstance();
+    if (_adminId == null) return;
 
-    final raw = prefs.getString(entry['key']);
-    if (raw == null) return;
+    final key = entry['key'] as String?;
+    if (key == null) return;
 
-    final data = json.decode(raw);
-    data['completed'] = true;
-
-    await prefs.setString(entry['key'], json.encode(data));
+    await _dbRef.child('repairs').child(_adminId!).child(key).update({'completed': true});
 
     // Update local state
     setState(() {
-      pendingRepairs.removeWhere((e) => e['key'] == entry['key']);
-      completedRepairs.add(entry..['completed'] = true);
+      pendingRepairs.removeWhere((e) => e['key'] == key);
+      entry['completed'] = true;
+      completedRepairs.add(entry);
     });
   }
 
@@ -94,7 +139,7 @@ class _RepairPageState extends State<RepairPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => RepairSelectionPage(widget.role)),
-              ).then((_) => loadRepairs()); // Refresh after returning
+              ).then((_) => _loadRepairs()); // Refresh after returning
             },
             child: const Text('Start Repair'),
           ),
@@ -122,11 +167,12 @@ class _RepairPageState extends State<RepairPage> {
                 return ListTile(
                   title: Text('${entry['danceTitle']} - ${entry['costumeTitle']}'),
                   subtitle: Text('Submitted by: ${entry['name']}'),
-                
-                  trailing: isAdmin ? ElevatedButton(
-                    onPressed: () => markAsCompleted(entry),
-                    child: const Text('Completed'),
-                  ) : null,
+                  trailing: isAdmin
+                      ? ElevatedButton(
+                          onPressed: () => markAsCompleted(entry),
+                          child: const Text('Completed'),
+                        )
+                      : null,
                   onTap: () {
                     Navigator.push(
                       context,
@@ -143,7 +189,6 @@ class _RepairPageState extends State<RepairPage> {
               },
             ),
           ),
-
           // Completed Repairs Section
           if (completedRepairs.isNotEmpty) ...[
             const Divider(),
@@ -152,7 +197,7 @@ class _RepairPageState extends State<RepairPage> {
               child: Text('Completed Repairs', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
             SizedBox(
-              height: 200, // fix height so both lists fit
+              height: 200, // fixed height so both lists fit
               child: ListView.builder(
                 itemCount: completedRepairs.length,
                 itemBuilder: (context, index) {

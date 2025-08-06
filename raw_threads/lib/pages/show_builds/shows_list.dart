@@ -3,8 +3,6 @@ import 'package:raw_threads/classes/main_classes/shows.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/pages/show_builds/shows_item.dart';
 
-// import 'package:threadline_initial/logins/users.dart';
-
 class ShowsList extends StatelessWidget {
   final List<Shows> shows;
   final void Function(Shows)? onRemoveShow;
@@ -16,13 +14,17 @@ class ShowsList extends StatelessWidget {
     super.key,
     required this.shows,
     required this.isAdmin,
-    required this.onRemoveShow,
-    required this.onEditShow,
+    this.onRemoveShow,
+    this.onEditShow,
     required this.allDances,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (shows.isEmpty) {
+      return const Center(child: Text('No shows available.'));
+    }
+
     return ListView.builder(
       itemCount: shows.length,
       itemBuilder: (ctx, index) {
@@ -35,11 +37,11 @@ class ShowsList extends StatelessWidget {
           },
           background: Container(color: Colors.red),
           child: ShowItem(
-            show: show, 
-            onEditShow: onEditShow, 
+            show: show,
+            onEditShow: onEditShow,
             allDances: allDances,
             isAdmin: isAdmin,
-            ),
+          ),
         );
       },
     );
