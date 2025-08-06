@@ -32,13 +32,14 @@ class _DanceSelectionPageState extends State<DanceSelectionPage> {
   Future<void> fetchDancesFromFirebase() async {
     setState(() => isLoading = true);
     try {
-      final ref = FirebaseDatabase.instance.ref('dances/${widget.adminId}');
+      final ref = FirebaseDatabase.instance.ref('admins/${widget.adminId}/dances');
       final snapshot = await ref.get();
       if (snapshot.exists) {
         final Map data = snapshot.value as Map;
         final dances = data.entries.map((entry) {
+          final Map<String, dynamic> valueMap = Map<String, dynamic>.from(entry.value);
           return Dances.fromJson({
-            ...entry.value,
+            ...valueMap,
             'id': entry.key,
           });
         }).toList();
