@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:raw_threads/classes/main_classes/shows.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart'; 
 import 'package:raw_threads/pages/show_builds/dance_selection_page.dart';
-import 'package:raw_threads/services/dance_inventory_service.dart';
 import 'package:firebase_database/firebase_database.dart';
+
+import 'package:provider/provider.dart';
+import 'package:raw_threads/providers/dance_inventory_provider.dart';
 
 class DanceStatusAndTeams {
   String status;
@@ -22,7 +24,7 @@ class EditShowPage extends StatefulWidget {
 }
 
 class _EditShowPageState extends State<EditShowPage> {
-  final DanceInventoryService _inventory = DanceInventoryService.instance;
+  late DanceInventoryProvider provider;
 
   late List<String> _selectedDanceIds;
   late TextEditingController _titleController;
@@ -143,8 +145,10 @@ class _EditShowPageState extends State<EditShowPage> {
 
   @override
   Widget build(BuildContext context) {
+    provider = context.watch<DanceInventoryProvider>();
+
     final selectedDances = _selectedDanceIds
-        .map((id) => _inventory.getById(id))
+        .map((id) => provider.getDanceById(id))
         .whereType<Dances>()
         .toList();
 
@@ -260,37 +264,48 @@ class _TeamsMultiSelectState extends State<TeamsMultiSelect> {
   }
 
   void _openDialog() async {
+    final tempSelected = Set<String>.from(selected);
+
     final result = await showDialog<Set<String>>(
       context: context,
       builder: (context) {
-        final tempSelected = Set<String>.from(selected);
-        return AlertDialog(
-          title: const Text('Select Teams'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView(
-              shrinkWrap: true,
-              children: widget.allTeams.map((team) {
-                return CheckboxListTile(
-                  title: Text(team),
-                  value: tempSelected.contains(team),
-                  onChanged: (bool? val) {
-                    setState(() {
-                      if (val == true) {
-                        tempSelected.add(team);
-                      } else {
-                        tempSelected.remove(team);
-                      }
-                    });
-                  },
-                );
-              }).toList(),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(null), child: const Text('Cancel')),
-            TextButton(onPressed: () => Navigator.of(context).pop(tempSelected), child: const Text('OK')),
-          ],
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Select Teams'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView(
+                  shrinkWrap: true,
+                  children: widget.allTeams.map((team) {
+                    return CheckboxListTile(
+                      title: Text(team),
+                      value: tempSelected.contains(team),
+                      onChanged: (bool? val) {
+                        setState(() {
+                          if (val == true) {
+                            tempSelected.add(team);
+                          } else {
+                            tempSelected.remove(team);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(tempSelected),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

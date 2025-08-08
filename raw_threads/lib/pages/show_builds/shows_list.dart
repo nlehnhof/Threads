@@ -39,7 +39,6 @@ class ShowsList extends StatelessWidget {
           child: ShowItem(
             show: show,
             onEditShow: onEditShow,
-            allDances: allDances,
             isAdmin: isAdmin,
           ),
         );

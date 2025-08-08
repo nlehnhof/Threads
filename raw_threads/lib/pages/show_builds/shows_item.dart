@@ -2,17 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:raw_threads/classes/main_classes/shows.dart';
 import 'package:raw_threads/pages/show_builds/edit_show_page.dart';
 import 'package:collection/collection.dart';
-import 'package:raw_threads/classes/main_classes/dances.dart';
+import 'package:provider/provider.dart';
+import 'package:raw_threads/providers/dance_inventory_provider.dart';
 
 class ShowItem extends StatefulWidget {
   final Shows show;
   final void Function(Shows show)? onEditShow;
-  final List<Dances> allDances;
   final bool isAdmin;
 
   const ShowItem({
     required this.show,
-    required this.allDances,
     this.onEditShow,
     this.isAdmin = false,
     super.key,
@@ -28,7 +27,7 @@ class _ShowItemState extends State<ShowItem> {
   @override
   Widget build(BuildContext context) {
     final show = widget.show;
-    final allDances = widget.allDances;
+    final allDances = context.watch<DanceInventoryProvider>().dances;
 
     return Card(
       elevation: 2,

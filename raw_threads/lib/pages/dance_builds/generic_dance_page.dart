@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/pages/costume_builds/costume_page.dart';
-import 'package:raw_threads/services/dance_inventory_service.dart'; // ✅ Import your service
 import 'package:raw_threads/pages/dance_builds/add_generic_dialog.dart';
-import 'dart:async';
+
+import 'package:raw_threads/providers/dance_inventory_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:raw_threads/providers/costume_provider.dart';
 
 class GenericDancePage extends StatefulWidget {
   final String role;
@@ -26,30 +28,11 @@ class GenericDancePage extends StatefulWidget {
 class _GenericDancePageState extends State<GenericDancePage> {
   late Dances dance;
   bool get isAdmin => widget.role == 'admin';
-  StreamSubscription? _danceDetailsSubscription;
 
   @override
   void initState() {
     super.initState();
-    dance = widget.dance; // Initialize dance from widget
-    _subscribeToDanceUpdates();
-  }
-
-  Future<void> _subscribeToDanceUpdates() async {
-    _danceDetailsSubscription?.cancel();
-    _danceDetailsSubscription = await DanceInventoryService.instance.listenToDance(dance.id, (updatedDance) {
-      if (mounted) {
-        setState(() {
-          dance = updatedDance;
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _danceDetailsSubscription?.cancel();
-    super.dispose();
+    dance = widget.dance;
   }
 
   ImageProvider? _buildImage(String? path) {
@@ -62,24 +45,27 @@ class _GenericDancePageState extends State<GenericDancePage> {
   }
 
   void _editDancePage() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AddGenericDialog(
-          dance: dance,
-          onSubmit: (updatedDance) async {
-            await DanceInventoryService.instance.update(updatedDance);
-            setState(() {
-              dance = updatedDance; // Update local state
-            });
-          },
-        ),
+    showDialog(
+      context: context,
+      builder: (_) => AddGenericDialog(
+        dance: dance,
+        onSubmit: (updatedDance) async {
+          final provider = context.read<DanceInventoryProvider>();
+          await provider.update(updatedDance);
+          if (!mounted) return;
+          setState(() => dance = updatedDance);
+        },
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<DanceInventoryProvider>();
+
+    final updatedDance = provider.getDanceById(dance.id);
+    if (updatedDance != null) dance = updatedDance;
+    
     return Scaffold(
       backgroundColor: myColors.secondary,
       appBar: AppBar(
@@ -112,8 +98,8 @@ class _GenericDancePageState extends State<GenericDancePage> {
                       TextButton(
                         onPressed: () async {
                           Navigator.of(context).pop(); // Close dialog
-                          await DanceInventoryService.instance.delete(dance.id); // Delete from storage
-                          widget.onDelete(dance); // Update parent UI
+                          await provider.delete(dance.id);
+                          widget.onDelete(dance);
                           if (!context.mounted) return;
                           Navigator.of(context).pop(); // Close this page
                         },
@@ -228,11 +214,17 @@ class _GenericDancePageState extends State<GenericDancePage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => CostumePage(
+              builder: (_) => ChangeNotifierProvider( 
+              create: (_) => CostumesProvider(
+                danceId: dance.id,
+                gender: label,
+              ),
+              child: CostumePage(
                 role: widget.role,
                 dance: dance,
                 gender: label,
               ),
+            ),
             ),
           );
         },

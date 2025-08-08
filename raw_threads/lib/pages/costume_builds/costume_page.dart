@@ -1,12 +1,13 @@
-import 'dart:async';
 import 'dart:io';
-
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
 import 'package:raw_threads/pages/costume_builds/add_edit_costume_dialog.dart';
-import 'package:raw_threads/services/costume_inventory_service.dart';
+import 'package:raw_threads/providers/assignments_provider.dart';
+import 'package:raw_threads/providers/costume_provider.dart';
+import 'package:raw_threads/pages/assignment_builds/assign_page.dart';
 
 class CostumePage extends StatefulWidget {
   final String role;
@@ -25,51 +26,25 @@ class CostumePage extends StatefulWidget {
 }
 
 class _CostumePageState extends State<CostumePage> {
-  bool get isAdmin => widget.role == 'admin';
-
-  List<CostumePiece> costumeList = [];
-  String? danceId;
   String get genderKey => widget.gender == 'Men' ? 'Men' : 'Women';
-
-  StreamSubscription? _listenerSub;
+  bool get isAdmin => widget.role == 'admin';
 
   @override
   void initState() {
     super.initState();
-    _initListeners();
+    _loadCostumes;
   }
 
-  Future<void> _initListeners() async {
-    danceId = widget.dance.id;
-
-    if (danceId == null) return;
-
-    // Load cached costumes first
-    await CostumeInventoryService.instance.load(danceId!, genderKey);
-    setState(() {
-      costumeList = CostumeInventoryService.instance.costumes;
-    });
-
-    // Listen for live updates from Firebase and update UI accordingly
-    _listenerSub = await CostumeInventoryService.instance.listenToCostumes(
-      danceId: danceId!,
-      gender: genderKey,
-      onUpdate: (updatedList) {
-        if (!mounted) return;
-        setState(() {
-          costumeList = updatedList;
-        });
-      },
-    );
-  }
-
-  @override
-  void dispose() {
-    _listenerSub?.cancel();
-    super.dispose();
+  void _loadCostumes(CostumePiece? existing) async {
+    final provider = context.read<CostumesProvider>();
+    if (existing != null) {
+      await provider.loadCostume(existing);
+    }
   }
 
   Future<void> _addOrEditCostume({CostumePiece? existing, int? index}) async {
+    final provider = context.read<CostumesProvider>();
+
     final result = await showDialog<CostumePiece?>(
       context: context,
       builder: (_) => AddEditCostumeDialog(
@@ -80,20 +55,13 @@ class _CostumePageState extends State<CostumePage> {
       ),
     );
 
-    if (result == null && index != null) {
-      // Delete costume
-      if (danceId != null) {
-        await CostumeInventoryService.instance.delete(danceId!, genderKey, costumeList[index].id);
-      }
+    if (result == null && existing != null && index != null) {
+      await provider.deleteCostume(widget.dance.id);
     } else if (result != null) {
-      if (danceId == null) return;
-
-      if (index != null) {
-        // Update existing costume
-        await CostumeInventoryService.instance.update(danceId!, genderKey, result);
+      if (existing != null) {
+        await provider.updateCostume(existing);
       } else {
-        // Add new costume
-        await CostumeInventoryService.instance.add(danceId!, genderKey, result);
+        await provider.addCostume(existing!);
       }
     }
   }
@@ -117,7 +85,6 @@ class _CostumePageState extends State<CostumePage> {
         title: Text(piece.title),
         content: SingleChildScrollView(
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               imageWidget,
@@ -146,12 +113,7 @@ class _CostumePageState extends State<CostumePage> {
     if (piece.imagePath != null && piece.imagePath!.isNotEmpty) {
       final file = File(piece.imagePath!);
       if (file.existsSync()) {
-        imageWidget = Image.file(
-          file,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: 150,
-        );
+        imageWidget = Image.file(file, fit: BoxFit.cover, width: double.infinity, height: 150);
       } else {
         imageWidget = _placeholderImage();
       }
@@ -161,6 +123,24 @@ class _CostumePageState extends State<CostumePage> {
 
     return GestureDetector(
       onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChangeNotifierProvider(
+              create: (_) => AssignmentsProvider(
+                danceId: widget.dance.id, 
+                gender: widget.gender, 
+                costumeId: piece.id,
+              ),
+              child: AssignPage(
+                costume: piece, 
+                role: widget.role,
+              ), 
+            ), 
+          ),
+        );
+      },
+      onLongPress: () {
         if (isAdmin) {
           _addOrEditCostume(existing: piece, index: index);
         } else {
@@ -173,11 +153,7 @@ class _CostumePageState extends State<CostumePage> {
           Card(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             clipBehavior: Clip.antiAlias,
-            child: SizedBox(
-              height: 150,
-              width: double.infinity,
-              child: imageWidget,
-            ),
+            child: SizedBox(height: 150, width: double.infinity, child: imageWidget),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
@@ -216,6 +192,9 @@ class _CostumePageState extends State<CostumePage> {
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<CostumesProvider>();
+    final costumes = provider.costumes;
+
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.gender} - ${widget.dance.title}'),
@@ -223,15 +202,15 @@ class _CostumePageState extends State<CostumePage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(4),
-        child: costumeList.isEmpty
+        child: costumes.isEmpty
             ? const Center(child: Text("No costumes found."))
             : GridView.count(
                 crossAxisCount: 2,
                 mainAxisSpacing: 8,
                 crossAxisSpacing: 8,
                 children: List.generate(
-                  costumeList.length,
-                  (index) => _buildCostumeCard(costumeList[index], index),
+                  costumes.length,
+                  (index) => _buildCostumeCard(costumes[index], index),
                 ),
               ),
       ),

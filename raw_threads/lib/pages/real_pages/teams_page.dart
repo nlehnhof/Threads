@@ -133,9 +133,11 @@ class _TeamsPageState extends State<TeamsPage> {
       'adminId': foundAdminId,
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Successfully linked to admin')),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Successfully linked to admin')),
+      );
+    }
 
     _adminIdController.clear();
     setState(() {});
@@ -160,6 +162,7 @@ class _TeamsPageState extends State<TeamsPage> {
     final role = await _getUserRole(currentUser!.uid);
     if (role == 'admin') {
       await _loadOrGenerateAdminCode();
+      await _loadTeamMembers();
       _listenToTeamMembers();
     }
     setState(() {});

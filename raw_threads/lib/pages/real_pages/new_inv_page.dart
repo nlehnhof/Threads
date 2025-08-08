@@ -1,12 +1,11 @@
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
-import 'package:raw_threads/services/dance_inventory_service.dart';
 import 'package:raw_threads/pages/dance_builds/generic_dance_page.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:raw_threads/pages/dance_builds/add_generic_dialog.dart';
-import 'dart:async';
-import 'package:raw_threads/services/auth_service.dart';
+
+import 'package:provider/provider.dart';
+import 'package:raw_threads/providers/dance_inventory_provider.dart';
 
 class DanceInventoryPage extends StatefulWidget {
   final String role;
@@ -17,64 +16,23 @@ class DanceInventoryPage extends StatefulWidget {
 }
 
 class _DanceInventoryPageState extends State<DanceInventoryPage> {
-  final DanceInventoryService _danceService = DanceInventoryService.instance;
   String searchQuery = "";
   bool sortByDance = true;
-  StreamSubscription<DatabaseEvent>? _danceSubscription;
-
-  @override
-  void initState() {
-    super.initState();
-    _danceService.load().then((_) {
-      setState(() {});
-    });
-    authService.value.getEffectiveAdminId().then((adminId) {
-      if (adminId != null) {
-        _danceSubscription = FirebaseDatabase.instance
-            .ref()
-            .child('admins')
-            .child(adminId)
-            .child('dances')
-            .onValue
-            .listen((event) {
-          _danceService.load().then((_) {
-            if (mounted) {
-              setState(() {});
-          }
-        });
-      });
-      }  
-    });
-  }
-
-  @override
-  void dispose() {
-    _danceSubscription?.cancel();
-    super.dispose();
-  }
-
-  void _addDance(Dances dance) async {
-    await _danceService.add(dance);
-    setState(() {
-    });
-  }
-
-  void _deleteDance(Dances dance) async {
-    await _danceService.delete(dance.id);
-    setState(() {});
-    if (mounted) {
-    Navigator.pop(context);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    List<Dances> filtered = _danceService.dances.where((dance) =>
-        dance.title.toLowerCase().contains(searchQuery) ||
-        dance.country.toLowerCase().contains(searchQuery)).toList();
+    final provider = context.watch<DanceInventoryProvider>();
+    final allDances = provider.dances;
+    
+    List<Dances> filtered = allDances
+        .where((dance) =>
+          dance.title.toLowerCase().contains(searchQuery) ||
+          dance.country.toLowerCase().contains(searchQuery))
+        .toList();
 
-    filtered.sort((a, b) =>
-        sortByDance ? a.title.compareTo(b.title) : a.country.compareTo(b.country));
+    filtered.sort((a, b) => sortByDance 
+        ? a.title.compareTo(b.title) 
+        : a.country.compareTo(b.country));
 
     return Scaffold(
       backgroundColor: myColors.secondary,
@@ -82,16 +40,17 @@ class _DanceInventoryPageState extends State<DanceInventoryPage> {
         title: const Text("Inventory"),
         centerTitle: true,
         actions: [
-          if (widget.role == 'admin') ...[
+          if (widget.role == 'admin')
             IconButton(
               icon: const Icon(Icons.add),
               onPressed: () => showDialog(
                 context: context,
-                builder: (_) => AddGenericDialog(onSubmit: _addDance),
+                builder: (_) => AddGenericDialog(
+                  onSubmit: (dance) => provider.add(dance),
+                ),
               ),
             )
           ],
-        ],
       ),
       body: Column(
         children: [
@@ -137,7 +96,12 @@ class _DanceInventoryPageState extends State<DanceInventoryPage> {
                         builder: (_) => GenericDancePage(
                           role: widget.role,
                           dance: dance,
-                          onDelete: _deleteDance,
+                          onDelete: (danceToDelete) async {
+                            await provider.delete(danceToDelete.id);
+                            if (mounted) {
+                              Navigator.pop(context);
+                            }
+                          },
                         ),
                       ),
                     );

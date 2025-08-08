@@ -3,7 +3,6 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
 import 'package:raw_threads/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/material.dart';
 import 'dart:convert';
 
 class CostumeInventoryService {
@@ -35,8 +34,6 @@ class CostumeInventoryService {
     }
     // Do NOT update _cachedCostumes here, the listener will handle it.
   }
-
-
 
   Future<void> load(String danceId, String gender) async {
     final prefs = await SharedPreferences.getInstance();
