@@ -75,6 +75,39 @@ class CostumeInventoryService {
     // Do NOT update _cachedCostumes here.
   }
 
+
+  /// Finds the danceId and gender for a costumeId by searching all dances and genders
+  Future<Map<String, String>?> findCostumePath(String targetCostumeId) async {
+    final adminId = await authService.value.getEffectiveAdminId();
+    if (adminId == null) return null;
+
+    final dancesSnap = await FirebaseDatabase.instance
+        .ref('admins/$adminId/dances')
+        .get();
+
+    final dances = dancesSnap.value as Map?;
+
+    if (dances == null) return null;
+
+    for (final danceEntry in dances.entries) {
+      final danceId = danceEntry.key;
+      final dance = danceEntry.value;
+
+      for (final gender in ['Men', 'Women']) {
+        final genderCostumes = (dance['costumes']?[gender]) as Map?;
+
+        if (genderCostumes != null && genderCostumes.containsKey(targetCostumeId)) {
+          return {
+            'danceId': danceId,
+            'gender': gender,
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+  
   /// Listen to Firebase updates for costumes under a specific dance and gender
   Future<StreamSubscription?> listenToCostumes({
     required String danceId,

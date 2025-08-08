@@ -38,7 +38,7 @@ class _CostumePageState extends State<CostumePage> {
   void _loadCostumes(CostumePiece? existing) async {
     final provider = context.read<CostumesProvider>();
     if (existing != null) {
-      await provider.loadCostume(existing);
+      await provider.initialize();
     }
   }
 
@@ -127,11 +127,7 @@ class _CostumePageState extends State<CostumePage> {
           context,
           MaterialPageRoute(
             builder: (_) => ChangeNotifierProvider(
-              create: (_) => AssignmentsProvider(
-                danceId: widget.dance.id, 
-                gender: widget.gender, 
-                costumeId: piece.id,
-              ),
+              create: (_) => AssignmentProvider(),
               child: AssignPage(
                 costume: piece, 
                 role: widget.role,

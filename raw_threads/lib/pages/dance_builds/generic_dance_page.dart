@@ -215,10 +215,7 @@ class _GenericDancePageState extends State<GenericDancePage> {
             context,
             MaterialPageRoute(
               builder: (_) => ChangeNotifierProvider( 
-              create: (_) => CostumesProvider(
-                danceId: dance.id,
-                gender: label,
-              ),
+              create: (_) => CostumesProvider(),
               child: CostumePage(
                 role: widget.role,
                 dance: dance,

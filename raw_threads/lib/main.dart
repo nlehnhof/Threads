@@ -8,6 +8,8 @@ import 'package:raw_threads/pages/real_pages/welcome_page.dart';
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:raw_threads/providers/shows_provider.dart';
+import 'package:raw_threads/providers/app_context_provider.dart';
+
 
 void main() async {
 
@@ -27,20 +29,25 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => DanceInventoryProvider()),
-        ChangeNotifierProvider(create: (_) => ShowsProvider()),
-        ChangeNotifierProvider(create: (_) => CostumesProvider(danceId: danceId, gender: gender)),
-        ChangeNotifierProvider(create: (_) => AssignmentsProvider(danceId: danceId, gender: gender, costumeId: costumeId)),
-      ],
-      child: MaterialApp(
-        title: 'Raw Threads',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightGreen),
-        ),
-        home: WelcomePage(),
-      ),
-    );
+return MultiProvider(
+  providers: [
+    ChangeNotifierProvider(create: (_) => AppContextProvider()), // first so others can read it
+    ChangeNotifierProvider(create: (_) => DanceInventoryProvider()),
+    ChangeNotifierProvider(create: (_) => ShowsProvider()),
+    ChangeNotifierProxyProvider<AppContextProvider, CostumesProvider>(
+      create: (_) => CostumesProvider(),
+      update: (_, appContext, costumesProvider) =>
+          costumesProvider!..updateContext(appContext.danceId, appContext.gender),
+    ),
+    ChangeNotifierProvider(create: (_) => AssignmentProvider()),
+  ],
+  child: MaterialApp(
+    title: 'Raw Threads',
+    theme: ThemeData(
+      colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightGreen),
+    ),
+    home: WelcomePage(),
+  ),
+);
   }
-} 
+}

@@ -22,12 +22,7 @@ class AssignmentService {
     await ref.set(assignment.toJson());
 
     final snapshot = await ref.get();
-
-    if (snapshot.exists) {
-      print('Verified');
-    } else {
-      print('Error');
-    }
+    print(snapshot.exists ? 'Verified' : 'Error');
   }
 
   Future<void> load(String costumeId) async {
@@ -43,6 +38,13 @@ class AssignmentService {
         .map((item) => Assignments.fromJson(item))
         .toList();
   }
+
+  Future<void> save(String costumeId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = json.encode(_cachedAssignments.map((a) => a.toJson()).toList());
+    await prefs.setString('assignments_$costumeId', encoded);
+  }
+
 
   Future<void> update(String danceId, String gender, String costumeId, Assignments updatedAssignment) async {
     final adminId = await authService.value.getEffectiveAdminId();
@@ -85,7 +87,7 @@ class AssignmentService {
     final ref = FirebaseDatabase.instance
         .ref('admins/$adminId/dances/$danceId/costumes/$gender/$costumeId/assignments');
 
-    return ref.onValue.listen((event) {
+    return ref.onValue.listen((event) async {
       final data = event.snapshot.value;
 
       if (data is Map) {
@@ -95,9 +97,11 @@ class AssignmentService {
         }).toList();
 
         _cachedAssignments = assignments;
+        await save(costumeId);
         onUpdate(assignments);
       } else {
         _cachedAssignments = [];
+        await save(costumeId);
         onUpdate([]);
       }
     });

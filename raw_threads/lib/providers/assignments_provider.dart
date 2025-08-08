@@ -1,32 +1,44 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:raw_threads/services/assignment_service.dart';
 import 'package:raw_threads/classes/main_classes/assignments.dart';
+import 'package:raw_threads/services/assignment_service.dart'; // hypothetical service managing assignments
+import 'dart:async';
 
-class AssignmentsProvider extends ChangeNotifier {
-  final String danceId;
-  final String gender;
-  final String costumeId;
+class AssignmentProvider extends ChangeNotifier {
+  String? _danceId;
+  String? _gender;
+  String? _costumeId;
 
   List<Assignments> _assignments = [];
   List<Assignments> get assignments => List.unmodifiable(_assignments);
+
   StreamSubscription<dynamic>? _subscription;
 
-  AssignmentsProvider({
-    // super.key,
-    required this.danceId,
-    required this.gender,
-    required this.costumeId,
-  }) {
-    _initialize();
+  AssignmentProvider();
+
+  void updateContext({String? danceId, String? gender, String? costumeId}) {
+    if (_danceId == danceId && _gender == gender && _costumeId == costumeId) return;
+
+    _danceId = danceId;
+    _gender = gender;
+    _costumeId = costumeId;
+
+    _subscription?.cancel();
+    _assignments = [];
+
+    if (_danceId != null && _gender != null && _costumeId != null) {
+      _initialize();
+    } else {
+      notifyListeners();
+    }
   }
 
   Future<void> _initialize() async {
-    // Start listening to Firebase changes
+    if (_danceId == null || _gender == null || _costumeId == null) return;
+
     _subscription = await AssignmentService.instance.listenToAssignments(
-      danceId: danceId,
-      gender: gender,
-      costumeId: costumeId,
+      danceId: _danceId!,
+      gender: _gender!,
+      costumeId: _costumeId!,
       onUpdate: (updatedList) {
         _assignments = updatedList;
         notifyListeners();
@@ -34,26 +46,24 @@ class AssignmentsProvider extends ChangeNotifier {
     );
   }
 
-  Future<void> addAssignment(Assignments assignments) async {
-    await AssignmentService.instance.add(danceId, gender, costumeId, assignments);
-    // The listener will automatically update the local list.
+  Future<void> addAssignment(Assignments assignment) async {
+    if (_danceId == null || _gender == null || _costumeId == null) return;
+    await AssignmentService.instance.add(_danceId!, _gender!, _costumeId!, assignment);
   }
 
-  Future<void> updateAssignment(Assignments assignments) async {
-    await AssignmentService.instance.update(danceId, gender, costumeId, assignments);
+  Future<void> updateAssignment(Assignments assignment) async {
+    if (_danceId == null || _gender == null || _costumeId == null) return;
+    await AssignmentService.instance.update(_danceId!, _gender!, _costumeId!, assignment);
   }
 
-  Future<void> deleteAssignment(String costumeId, String assignmentId) async {
-    await AssignmentService.instance.delete(danceId, gender, costumeId, assignmentId);
-  }
-
-  Future<void> loadAssignments(Assignments assignments) async {
-    await AssignmentService.instance.load(costumeId);
+  Future<void> deleteAssignment(Assignments assignment) async {
+    if (_danceId == null || _gender == null || _costumeId == null) return;
+    await AssignmentService.instance.delete(_danceId!, _gender!, _costumeId!, assignment.id);
   }
 
   @override
   void dispose() {
-    _subscription?.cancel(); // Clean up listener
+    _subscription?.cancel();
     super.dispose();
   }
 }

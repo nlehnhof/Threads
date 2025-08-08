@@ -1,30 +1,65 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
 import 'package:raw_threads/services/costume_inventory_service.dart';
 
 class CostumesProvider extends ChangeNotifier {
-  final String danceId;
-  final String gender;
+  String? _danceId;
+  String? _gender;
 
   List<CostumePiece> _costumes = [];
   List<CostumePiece> get costumes => List.unmodifiable(_costumes);
   StreamSubscription<dynamic>? _subscription;
 
-  CostumesProvider({
-    // super.key,
-    required this.danceId,
-    required this.gender,
-  }) {
-    _initialize();
+  CostumesProvider();
+
+
+  final Map<String, Map<String, List<CostumePiece>>> _costumesByDance = {};
+
+    // Your existing methods...
+
+    /// Find the danceId and gender for a costume by its ID.
+    Map<String, String>? findPath(String costumeId) {
+      for (var danceEntry in _costumesByDance.entries) {
+        final danceId = danceEntry.key;
+        final genderMap = danceEntry.value;
+
+        for (var genderEntry in genderMap.entries) {
+          final gender = genderEntry.key;
+          final costumes = genderEntry.value;
+
+          if (costumes.any((c) => c.id == costumeId)) {
+            return {
+              'danceId': danceId,
+              'gender': gender,
+            };
+          }
+        }
+      }
+      return null; // Not found
+    }
+
+  void updateContext(String? danceId, String? gender) {
+    if (_danceId == danceId && _gender == gender) return; // no change
+    _danceId = danceId;
+    _gender = gender;
+
+    _subscription?.cancel();
+    _costumes = [];
+
+    if (_danceId != null && _gender != null) {
+      initialize();
+    } else {
+      notifyListeners();
+    }
   }
 
-  Future<void> _initialize() async {
-    // Start listening to Firebase changes
+  Future<void> initialize() async {
+    if (_danceId == null || _gender == null) return;
+
     _subscription = await CostumeInventoryService.instance.listenToCostumes(
-      danceId: danceId,
-      gender: gender,
+      danceId: _danceId!,
+      gender: _gender!,
       onUpdate: (updatedList) {
         _costumes = updatedList;
         notifyListeners();
@@ -33,25 +68,23 @@ class CostumesProvider extends ChangeNotifier {
   }
 
   Future<void> addCostume(CostumePiece costume) async {
-    await CostumeInventoryService.instance.add(danceId, gender, costume);
-    // The listener will automatically update the local list.
+    if (_danceId == null || _gender == null) return;
+    await CostumeInventoryService.instance.add(_danceId!, _gender!, costume);
   }
 
   Future<void> updateCostume(CostumePiece costume) async {
-    await CostumeInventoryService.instance.update(danceId, gender, costume);
+    if (_danceId == null || _gender == null) return;
+    await CostumeInventoryService.instance.update(_danceId!, _gender!, costume);
   }
 
   Future<void> deleteCostume(String costumeId) async {
-    await CostumeInventoryService.instance.delete(danceId, gender, costumeId);
-  }
-
-  Future<void> loadCostume(CostumePiece costume) async {
-    await CostumeInventoryService.instance.load(danceId, gender);
+    if (_danceId == null || _gender == null) return;
+    await CostumeInventoryService.instance.delete(_danceId!, _gender!, costumeId);
   }
 
   @override
   void dispose() {
-    _subscription?.cancel(); // Clean up listener
+    _subscription?.cancel();
     super.dispose();
   }
 }
