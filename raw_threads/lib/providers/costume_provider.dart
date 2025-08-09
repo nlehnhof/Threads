@@ -9,35 +9,32 @@ class CostumesProvider extends ChangeNotifier {
 
   List<CostumePiece> _costumes = [];
   List<CostumePiece> get costumes => List.unmodifiable(_costumes);
+
   StreamSubscription<dynamic>? _subscription;
-
   CostumesProvider();
-
 
   final Map<String, Map<String, List<CostumePiece>>> _costumesByDance = {};
 
-    // Your existing methods...
-
     /// Find the danceId and gender for a costume by its ID.
-    Map<String, String>? findPath(String costumeId) {
-      for (var danceEntry in _costumesByDance.entries) {
-        final danceId = danceEntry.key;
-        final genderMap = danceEntry.value;
+  Future<Map<String, String>?> findPath(String costumeId) async {
+    for (var danceEntry in _costumesByDance.entries) {
+      final danceId = danceEntry.key;
+      final genderMap = danceEntry.value;
 
-        for (var genderEntry in genderMap.entries) {
-          final gender = genderEntry.key;
-          final costumes = genderEntry.value;
-
-          if (costumes.any((c) => c.id == costumeId)) {
-            return {
-              'danceId': danceId,
-              'gender': gender,
-            };
-          }
+      for (var genderEntry in genderMap.entries) {
+        final gender = genderEntry.key;
+        final costumes = genderEntry.value;
+        
+        if (costumes.any((c) => c.id == costumeId)) {
+          return {
+            'danceId': danceId,
+            'gender': gender,
+          };
         }
       }
-      return null; // Not found
     }
+    return null; // Not found
+  }
 
   void updateContext(String? danceId, String? gender) {
     if (_danceId == danceId && _gender == gender) return; // no change
@@ -68,6 +65,7 @@ class CostumesProvider extends ChangeNotifier {
   }
 
   Future<void> addCostume(CostumePiece costume) async {
+    print('Adding costume to dance $_danceId gender $_gender');
     if (_danceId == null || _gender == null) return;
     await CostumeInventoryService.instance.add(_danceId!, _gender!, costume);
   }

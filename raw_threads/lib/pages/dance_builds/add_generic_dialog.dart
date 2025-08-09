@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
+import 'package:raw_threads/classes/style_classes/my_colors.dart';
 
 final uuid = Uuid();
 
@@ -265,7 +266,7 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
                         }
                       : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF9DA99B),
+                    backgroundColor: myColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

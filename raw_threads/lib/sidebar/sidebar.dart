@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:raw_threads/classes/style_classes/my_colors.dart';
+import 'package:raw_threads/pages/real_pages/welcome_page.dart';
 import 'package:raw_threads/sidebar/sidebar_item.dart';
 import 'package:raw_threads/pages/real_pages/home_page.dart'; 
 import 'package:raw_threads/pages/real_pages/new_inv_page.dart';
@@ -51,9 +53,40 @@ class Sidebar extends StatelessWidget {
 
             const Spacer(), // Push the next section to the bottom
 
-            // Bottom section: Profile, Log Out (24px from bottom)
             // SidebarItem(destinationBuilder: () => const ProfilePage(), label: 'Profile'),
-            // SidebarItem(destinationBuilder: () => const WelcomePage(), label: 'Log Out'),
+            SidebarItem(destinationBuilder: () => 
+                AlertDialog(
+                  backgroundColor: myColors.primary,
+                  title: Text('Logout?', style: TextStyle(fontFamily: 'Vogun', fontSize: 24, color: myColors.secondary)),
+                  actions: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: () async {
+                            Navigator.pop(context); // close dialog first
+                            // Add sign out here if using Firebase Auth
+                            // await FirebaseAuth.instance.signOut();
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (_) => WelcomePage()),
+                            );
+                          },
+                          child: Text(
+                            'Logout',
+                            style: TextStyle(fontSize: 18, color: myColors.secondary),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text('Cancel', style: TextStyle(fontSize: 18, color: Colors.red)),
+                          ),
+                      ],
+                    ),
+                  ],
+                  ), 
+                  label: 'Logout'),
+            
             const SizedBox(height: 24),
           ],
         ),

@@ -18,6 +18,7 @@ class DanceInventoryPage extends StatefulWidget {
 class _DanceInventoryPageState extends State<DanceInventoryPage> {
   String searchQuery = "";
   bool sortByDance = true;
+  bool get isAdmin => widget.role == 'admin';
 
   @override
   Widget build(BuildContext context) {

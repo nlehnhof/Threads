@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
+import 'package:raw_threads/providers/dance_inventory_provider.dart';
 import 'package:raw_threads/services/dance_inventory_service.dart';
 import 'repair_details_page.dart';
+import 'package:raw_threads/providers/costume_provider.dart';
+import 'package:provider/provider.dart';
 
 class RepairSelectionPage extends StatefulWidget {
   final String role;
@@ -25,16 +28,12 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
     DanceInventoryService.instance.load().then((_) => setState(() {}));
   }
 
-  List<CostumePiece> get selectedCostumeList {
-    if (selectedDance == null || selectedGender == null) return [];
-    return selectedGender == 'Men'
-        ? selectedDance!.costumesMen
-        : selectedDance!.costumesWomen;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final dances = DanceInventoryService.instance.dances;
+    final danceProvider = context.watch<DanceInventoryProvider>();
+    final dances = danceProvider.dances;
+    final costumesProvider = context.watch<CostumesProvider>();
+    final costumesList = costumesProvider.costumes;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Select Dance and Costume')),
@@ -50,7 +49,10 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
                   selectedDance = newValue;
                   selectedGender = null;
                   selectedCostume = null;
-                });
+                });                
+                if (newValue != null && selectedGender != null) {
+                  context.read<CostumesProvider>().updateContext(newValue.id, selectedGender);
+                }
               },
               items: dances.map((dance) {
                 return DropdownMenuItem(
@@ -69,6 +71,9 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
                     selectedGender = newValue;
                     selectedCostume = null;
                   });
+                  if (selectedDance != null && newValue != null) {
+                    context.read<CostumesProvider>().updateContext(selectedDance!.id, newValue);
+                  }
                 },
                 items: const [
                   DropdownMenuItem(value: 'Men', child: Text('Men')),
@@ -77,7 +82,7 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
               ),
             const SizedBox(height: 16),
             if (selectedGender != null)
-              selectedCostumeList.isNotEmpty
+              costumesList.isNotEmpty
                   ? DropdownButton<CostumePiece>(
                       hint: const Text('Select Costume Piece'),
                       value: selectedCostume,
@@ -86,7 +91,7 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
                           selectedCostume = newValue;
                         });
                       },
-                      items: selectedCostumeList.map((piece) {
+                      items: costumesList.map((piece) {
                         return DropdownMenuItem(
                           value: piece,
                           child: Text(piece.title),

@@ -16,15 +16,20 @@ class CostumeInventoryService {
   /// Add a costume to Firebase only
   Future<void> add(String danceId, String gender, CostumePiece costume) async {
     final adminId = await authService.value.getEffectiveAdminId();
-    if (adminId == null) return;
+    print('Admin ID: $adminId');
+    if (adminId == null) {
+      print('Admin is null.');
+      return;
+    }
+
+    print('Adding costume to admins/$adminId/dances/$danceId/costumes/$gender/${costume.id}');
+    print('Costume JSON: ${costume.toJson()}');
 
     final ref = FirebaseDatabase.instance
         .ref('admins/$adminId/dances/$danceId/costumes/$gender/${costume.id}');
 
     await ref.set(costume.toJson());
-
-    print('Costume added: ${costume.title} with id: ${costume.id}');
-
+    
     final snapshot = await ref.get();
 
     if (snapshot.exists) {

@@ -46,7 +46,7 @@ class _RepairPageState extends State<RepairPage> {
     }
 
     if (_adminId != null) {
-      _repairListener =_dbRef.child('repairs').child(_adminId!).onValue.listen((event) {
+      _repairListener = _dbRef.child('admins').child(_adminId!).child('repairs').onValue.listen((event) {
        final repairsMapRaw = event.snapshot.value;
         if (repairsMapRaw is Map) {
           final pending = <Map<String, dynamic>>[];
@@ -85,7 +85,7 @@ class _RepairPageState extends State<RepairPage> {
   Future<void> _loadRepairs() async {
     if (_adminId == null) return;
 
-    final repairsSnapshot = await _dbRef.child('repairs').child(_adminId!).get();
+    final repairsSnapshot = await _dbRef.child('admins').child(_adminId!).child('repairs').get();
 
     final pending = <Map<String, dynamic>>[];
     final completed = <Map<String, dynamic>>[];
@@ -116,7 +116,7 @@ class _RepairPageState extends State<RepairPage> {
     final key = entry['key'] as String?;
     if (key == null) return;
 
-    await _dbRef.child('repairs').child(_adminId!).child(key).update({'completed': true});
+    await _dbRef.child('admins').child(_adminId!).child('repairs').child(key).update({'completed': true});
 
     // Update local state
     setState(() {
@@ -179,7 +179,7 @@ class _RepairPageState extends State<RepairPage> {
                       MaterialPageRoute(
                         builder: (_) => RepairSummaryPage(
                           role: widget.role,
-                          danceTitle: entry['danceTitle'],
+                          repairKey: entry['key'],
                           costumeTitle: entry['costumeTitle'],
                         ),
                       ),
@@ -212,7 +212,7 @@ class _RepairPageState extends State<RepairPage> {
                         MaterialPageRoute(
                           builder: (_) => RepairSummaryPage(
                             role: widget.role,
-                            danceTitle: entry['danceTitle'],
+                            repairKey: entry['key'],
                             costumeTitle: entry['costumeTitle'],
                           ),
                         ),

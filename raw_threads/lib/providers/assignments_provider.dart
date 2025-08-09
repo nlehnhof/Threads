@@ -16,7 +16,11 @@ class AssignmentProvider extends ChangeNotifier {
   AssignmentProvider();
 
   void updateContext({String? danceId, String? gender, String? costumeId}) {
-    if (_danceId == danceId && _gender == gender && _costumeId == costumeId) return;
+    print('updateContext called');
+    if (_danceId == danceId && _gender == gender && _costumeId == costumeId) {
+      print('Context unchanged, returning early');
+      return;
+    }
 
     _danceId = danceId;
     _gender = gender;
@@ -26,8 +30,10 @@ class AssignmentProvider extends ChangeNotifier {
     _assignments = [];
 
     if (_danceId != null && _gender != null && _costumeId != null) {
+      print('Initialize');
       _initialize();
     } else {
+      print('One or more IDs are null');
       notifyListeners();
     }
   }

@@ -8,6 +8,7 @@ import 'dart:convert';
 class DanceInventoryProvider extends ChangeNotifier {
   final List<Dances> _dances = [];
   List<Dances> get dances => List.unmodifiable(_dances);
+
   final Map<String, Dances> _danceMap = {};
   List<Dances> get allDances => _danceMap.values.toList();
 
@@ -34,8 +35,7 @@ class DanceInventoryProvider extends ChangeNotifier {
     final adminId = await authService.value.getEffectiveAdminId();
     if (adminId == null) return;
 
-    final ref = FirebaseDatabase.instance
-        .ref('admins/$adminId/dances/${dance.id}');
+    final ref = FirebaseDatabase.instance.ref('admins/$adminId/dances/${dance.id}');
     await ref.set(dance.toJson());
 
     _dances.add(dance);

@@ -5,9 +5,10 @@ import 'package:provider/provider.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
 import 'package:raw_threads/pages/costume_builds/add_edit_costume_dialog.dart';
+import 'package:raw_threads/pages/assignment_builds/assign_page.dart';
+
 import 'package:raw_threads/providers/assignments_provider.dart';
 import 'package:raw_threads/providers/costume_provider.dart';
-import 'package:raw_threads/pages/assignment_builds/assign_page.dart';
 
 class CostumePage extends StatefulWidget {
   final String role;
@@ -32,14 +33,8 @@ class _CostumePageState extends State<CostumePage> {
   @override
   void initState() {
     super.initState();
-    _loadCostumes;
-  }
-
-  void _loadCostumes(CostumePiece? existing) async {
     final provider = context.read<CostumesProvider>();
-    if (existing != null) {
-      await provider.initialize();
-    }
+    provider.updateContext(widget.dance.id, widget.gender);
   }
 
   Future<void> _addOrEditCostume({CostumePiece? existing, int? index}) async {
@@ -50,18 +45,18 @@ class _CostumePageState extends State<CostumePage> {
       builder: (_) => AddEditCostumeDialog(
         existing: existing,
         allowDelete: existing != null,
-        onSave: (_) {},
+        onSave: (costume) => Navigator.of(context).pop(costume),
         role: widget.role,
       ),
     );
 
     if (result == null && existing != null && index != null) {
-      await provider.deleteCostume(widget.dance.id);
+      await provider.deleteCostume(existing.id);
     } else if (result != null) {
       if (existing != null) {
-        await provider.updateCostume(existing);
+        await provider.updateCostume(result);
       } else {
-        await provider.addCostume(existing!);
+        await provider.addCostume(result);
       }
     }
   }

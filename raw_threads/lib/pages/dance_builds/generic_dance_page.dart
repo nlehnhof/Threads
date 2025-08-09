@@ -1,12 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
+
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/pages/costume_builds/costume_page.dart';
 import 'package:raw_threads/pages/dance_builds/add_generic_dialog.dart';
 
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
-import 'package:provider/provider.dart';
 import 'package:raw_threads/providers/costume_provider.dart';
 
 class GenericDancePage extends StatefulWidget {

@@ -34,7 +34,7 @@ class _AddEditAssignmentsState extends State<AddEditAssignments> {
 
     final existing = widget.existing;
 
-    _numberController = TextEditingController(text: existing?.title ?? '');
+    _numberController = TextEditingController(text: existing?.number ?? '');
     _sizeController = TextEditingController(text: existing?.size ?? '');
     _userController = TextEditingController(text: existing?.user ?? '');
   }
@@ -47,7 +47,7 @@ class _AddEditAssignmentsState extends State<AddEditAssignments> {
     super.dispose();
   }
 
-  void _onSavePressed() {
+  Future<void> _onSavePressed() async {
     final number = _numberController.text.trim();
     final size = _sizeController.text.trim();
     final user = _userController.text.trim();
@@ -60,8 +60,7 @@ class _AddEditAssignmentsState extends State<AddEditAssignments> {
       user: user,
     );
 
-    widget.onSave(newAssignment);
-    Navigator.of(context).pop(newAssignment);
+    await widget.onSave(newAssignment);
   }
 
   @override

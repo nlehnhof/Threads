@@ -12,12 +12,14 @@ class RepairDetailsPage extends StatefulWidget {
   final Dances dance;
   final CostumePiece costume;
   final String role;
+  final String? repairKey;
 
   const RepairDetailsPage(
     this.role, {
     super.key,
     required this.dance,
     required this.costume,
+    this.repairKey,
   });
 
   @override
@@ -176,9 +178,16 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
       // add 'thumbnailPath' here if you generate and want to save thumbnails
     };
 
-    final key = '${widget.dance.id}_${widget.costume.title}';
+    final repairsRef = _dbRef.child('admins').child(adminId!).child('repairs');
 
-    await _dbRef.child('admins').child(adminId!).child('repairs').child(key).set(repairData);
+    if (widget.repairKey != null && widget.repairKey!.isNotEmpty) {
+      // Update existing repair
+      await repairsRef.child(widget.repairKey!).set(repairData);
+    } else {
+      // Create new repair with a unique key from push()
+      final newRef = repairsRef.push();
+      await newRef.set(repairData);
+    }
   }
 
   Widget buildIssueCard(Map<String, dynamic> issue, int index) {
@@ -240,6 +249,8 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final key = '${widget.dance.id}_${widget.costume.title}';
+
     return Scaffold(
       appBar: AppBar(title: Text('${widget.dance.title} - ${widget.costume.title}')),
       body: SingleChildScrollView(
@@ -294,7 +305,7 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => RepairSummaryPage(
-                          danceTitle: widget.dance.title,
+                          repairKey: key,
                           costumeTitle: widget.costume.title,
                           role: widget.role,
                         ),

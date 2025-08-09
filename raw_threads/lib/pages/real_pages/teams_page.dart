@@ -31,72 +31,72 @@ class _TeamsPageState extends State<TeamsPage> {
 
   String? _adminCode;
 
-  void _listenToTeamMembers() {
-    final adminId = currentUser!.uid;
+  // void _listenToTeamMembers() {
+  //   final adminId = currentUser!.uid;
 
-    _teamListener = _dbRef
-        .child('users')
-        .orderByChild('adminId')
-        .equalTo(adminId)
-        .onValue
-        .listen((event) {
-      final snapshot = event.snapshot;
-      if (snapshot.exists && snapshot.value is Map) {
-        final rawMap = Map<String, dynamic>.from(snapshot.value as Map);
-        final members = rawMap.entries.map((e) {
-          final map = Map<String, dynamic>.from(e.value);
-          map['uid'] = e.key;
-          return map;
-        }).toList();
+  //   _teamListener = _dbRef
+  //       .child('users')
+  //       .orderByChild('adminId')
+  //       .equalTo(adminId)
+  //       .onValue
+  //       .listen((event) {
+  //     final snapshot = event.snapshot;
+  //     if (snapshot.exists && snapshot.value is Map) {
+  //       final rawMap = Map<String, dynamic>.from(snapshot.value as Map);
+  //       final members = rawMap.entries.map((e) {
+  //         final map = Map<String, dynamic>.from(e.value);
+  //         map['uid'] = e.key;
+  //         return map;
+  //       }).toList();
 
-        setState(() {
-          _teamMembers = members;
-        });
-      } else {
-        setState(() {
-          _teamMembers = [];
-        });
-      }
-    });
-  }
+  //       setState(() {
+  //         _teamMembers = members;
+  //       });
+  //     } else {
+  //       setState(() {
+  //         _teamMembers = [];
+  //       });
+  //     }
+  //   });
+  // }
   
-  Future<void> _loadTeamMembers() async {
-    if (currentUser == null) return;
-    setState(() => _loading = true);
+  // Future<void> _loadTeamMembers() async {
+  //   if (currentUser == null) return;
+  //   setState(() => _loading = true);
 
-    final adminId = currentUser!.uid;
+  //   final adminId = currentUser!.uid;
 
-    final codeSnap = await _dbRef.child('admins').child(adminId).child('code').get();
-    if (codeSnap.exists) {
-      _adminCode = codeSnap.value as String?;
-    } else {
-      _adminCode = (100000 + DateTime.now().millisecondsSinceEpoch % 900000).toString();
-      await _dbRef.child('admins').child(adminId).set({
-        'code': _adminCode,
-      });
-    }
+  //   final codeSnap = await _dbRef.child('admins').child(adminId).child('code').get();
+  //   if (codeSnap.exists) {
+  //     _adminCode = codeSnap.value as String?;
+  //   } else {
+  //     _adminCode = (100000 + DateTime.now().millisecondsSinceEpoch % 900000).toString();
+  //     await _dbRef.child('admins').child(adminId).set({
+  //       'code': _adminCode,
+  //     });
+  //   }
 
-    final snapshot = await _dbRef.child('users').orderByChild('adminId').equalTo(adminId).get();
+  //   final snapshot = await _dbRef.child('users').orderByChild('adminId').equalTo(adminId).get();
 
-    if (snapshot.exists) {
-      final rawMap = Map<String, dynamic>.from(snapshot.value as Map);
-      final List<Map<String, dynamic>> members = [];
-      rawMap.forEach((key, value) {
-        final map = Map<String, dynamic>.from(value);
-        map['uid'] = key;
-        members.add(map);
-      });
-      setState(() {
-        _teamMembers = members;
-      });
-    } else {
-      setState(() {
-        _teamMembers = [];
-      });
-    }
+  //   if (snapshot.exists) {
+  //     final rawMap = Map<String, dynamic>.from(snapshot.value as Map);
+  //     final List<Map<String, dynamic>> members = [];
+  //     rawMap.forEach((key, value) {
+  //       final map = Map<String, dynamic>.from(value);
+  //       map['uid'] = key;
+  //       members.add(map);
+  //     });
+  //     setState(() {
+  //       _teamMembers = members;
+  //     });
+  //   } else {
+  //     setState(() {
+  //       _teamMembers = [];
+  //     });
+  //   }
 
-    setState(() => _loading = false);
-  }
+  //   setState(() => _loading = false);
+  // }
 
   Future<void> _linkUserToAdminCode(String code) async {
     if (currentUser == null) return;
@@ -147,7 +147,57 @@ class _TeamsPageState extends State<TeamsPage> {
   @override
   void initState() {
     super.initState();
-    _initLoad();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    if (currentUser == null) return;
+
+    setState(() => _loading = true);
+
+    final uid = currentUser!.uid;
+
+    // Fetch role + admin code in parallel
+    final results = await Future.wait([
+      _dbRef.child('users/$uid/role').get(),
+      _dbRef.child('admins/$uid/code').get(),
+    ]);
+
+    final roleSnap = results[0];
+    final codeSnap = results[1];
+
+    final role = roleSnap.value as String?;
+
+    if (role == 'admin') {
+      if (codeSnap.exists) {
+        _adminCode = codeSnap.value as String;
+      } else {
+        _adminCode = uid.substring(0, 6); // or random 6-digit
+        await _dbRef.child('admins/$uid').set({'code': _adminCode});
+      }
+
+      // Start listening immediately instead of loading then listening
+      _teamListener = _dbRef
+          .child('users')
+          .orderByChild('adminId')
+          .equalTo(uid)
+          .onValue
+          .listen((event) {
+        if (event.snapshot.exists && event.snapshot.value is Map) {
+          final raw = Map<String, dynamic>.from(event.snapshot.value as Map);
+          final members = raw.entries.map((e) {
+            final m = Map<String, dynamic>.from(e.value);
+            m['uid'] = e.key;
+            return m;
+          }).toList();
+          setState(() => _teamMembers = members);
+        } else {
+          setState(() => _teamMembers = []);
+        }
+      });
+    }
+
+    setState(() => _loading = false);
   }
 
   @override
@@ -157,28 +207,28 @@ class _TeamsPageState extends State<TeamsPage> {
     super.dispose();
   }
 
-  Future<void> _initLoad() async {
-    if (currentUser == null) return;
-    final role = await _getUserRole(currentUser!.uid);
-    if (role == 'admin') {
-      await _loadOrGenerateAdminCode();
-      await _loadTeamMembers();
-      _listenToTeamMembers();
-    }
-    setState(() {});
-  }
+  // Future<void> _initLoad() async {
+  //   if (currentUser == null) return;
+  //   final role = await _getUserRole(currentUser!.uid);
+  //   if (role == 'admin') {
+  //     await _loadOrGenerateAdminCode();
+  //     await _loadTeamMembers();
+  //     _listenToTeamMembers();
+  //   }
+  //   setState(() {});
+  // }
 
-  Future<void> _loadOrGenerateAdminCode() async {
-    final adminId = currentUser!.uid;
+  // Future<void> _loadOrGenerateAdminCode() async {
+  //   final adminId = currentUser!.uid;
 
-    final codeSnap = await _dbRef.child('admins').child(adminId).child('code').get();
-    if (codeSnap.exists) {
-      _adminCode = codeSnap.value as String?;
-    } else {
-      _adminCode = (100000 + DateTime.now().millisecondsSinceEpoch % 900000).toString();
-      await _dbRef.child('admins').child(adminId).set({'code': _adminCode});
-    }
-  }
+  //   final codeSnap = await _dbRef.child('admins').child(adminId).child('code').get();
+  //   if (codeSnap.exists) {
+  //     _adminCode = codeSnap.value as String?;
+  //   } else {
+  //     _adminCode = (100000 + DateTime.now().millisecondsSinceEpoch % 900000).toString();
+  //     await _dbRef.child('admins').child(adminId).set({'code': _adminCode});
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
