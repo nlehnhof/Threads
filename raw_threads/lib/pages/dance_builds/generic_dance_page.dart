@@ -9,6 +9,7 @@ import 'package:raw_threads/pages/dance_builds/add_generic_dialog.dart';
 
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
 import 'package:raw_threads/providers/costume_provider.dart';
+import 'package:raw_threads/providers/teams_provider.dart';
 
 class GenericDancePage extends StatefulWidget {
   final String role;
@@ -57,6 +58,66 @@ class _GenericDancePageState extends State<GenericDancePage> {
           setState(() => dance = updatedDance);
         },
       ),
+    );
+  }
+
+  void _showAssignDanceToTeamDialog(BuildContext context) {
+    final teamProvider = Provider.of<TeamProvider>(context, listen: false);
+
+    // Use a Set to track selected teams
+    final selectedTeamIds = <String>{};
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Assign Dance to Teams'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Consumer<TeamProvider>(
+              builder: (context, provider, child) {
+                if (provider.teams.isEmpty) {
+                  return const Text('No teams available. Please add teams first.');
+                }
+                return ListView(
+                  shrinkWrap: true,
+                  children: provider.teams.map((team) {
+                    final isSelected = selectedTeamIds.contains(team.id);
+                    return CheckboxListTile(
+                      title: Text(team.title),
+                      value: isSelected,
+                      onChanged: (checked) {
+                        setState(() {
+                          if (checked == true) {
+                            selectedTeamIds.add(team.id);
+                          } else {
+                            selectedTeamIds.remove(team.id);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                for (final teamId in selectedTeamIds) {
+                  await teamProvider.assignDanceToTeam(dance.id, teamId);
+                }
+                Navigator.pop(context);
+              },
+              child: const Text('Assign'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -152,7 +213,7 @@ class _GenericDancePageState extends State<GenericDancePage> {
                 width: 337,
                 height: 60,
                 child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => _showAssignDanceToTeamDialog(context),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
                     backgroundColor: myColors.primary,
