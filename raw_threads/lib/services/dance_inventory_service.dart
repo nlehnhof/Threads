@@ -69,7 +69,7 @@ class DanceInventoryService {
   }
 
   Future<void> delete(String id) async {
-final adminId = await authService.value.getEffectiveAdminId();
+    final adminId = await authService.value.getEffectiveAdminId();
     if (adminId == null) return;
 
     await FirebaseDatabase.instance

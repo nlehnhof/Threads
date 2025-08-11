@@ -47,7 +47,15 @@ class _DanceInventoryPageState extends State<DanceInventoryPage> {
               onPressed: () => showDialog(
                 context: context,
                 builder: (_) => AddGenericDialog(
-                  onSubmit: (dance) => provider.add(dance),
+                onSubmit: (dance) async {
+                  try {
+                    await provider.add(dance);
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to add dance: $e')),
+                    );
+                  }
+                },
                 ),
               ),
             )

@@ -20,6 +20,7 @@ class AuthService {
         email: email,
         password: password,
       );
+
       User? user = result.user;
 
       if (user != null) {
@@ -46,6 +47,22 @@ class AuthService {
       }
     } catch (e) {
       rethrow;
+    }
+  }
+
+  Future<void> ensureAdminCodeExists() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    final adminId = user.uid;
+    final adminCodeRef = _dbRef.child('admins').child(adminId).child('admincode');
+
+    final snapshot = await adminCodeRef.get();
+
+    if (!snapshot.exists) {
+      // Generate adminCode, e.g. first 6 chars of UID
+      final adminCode = adminId.substring(0, 6);
+      await adminCodeRef.set(adminCode);
     }
   }
 

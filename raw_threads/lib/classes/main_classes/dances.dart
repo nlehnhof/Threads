@@ -10,6 +10,7 @@ class Dances {
     required this.id,
     required this.title,
     required this.country,
+    this.region = '',
     this.available = 0,
     this.total = 0,
     this.category = Category.notready,
@@ -23,6 +24,7 @@ class Dances {
   final String id;
   final String title;
   final String country;
+  final String region;
   final int available;
   final int total;
   final Category category;
@@ -36,6 +38,7 @@ class Dances {
     String? id,
     String? title,
     String? country,
+    String? region,
     int? available,
     int? total,
     Category? category,
@@ -49,6 +52,7 @@ class Dances {
       id: id ?? this.id,
       title: title ?? this.title,
       country: country ?? this.country,
+      region: region ?? this.region,
       available: available ?? this.available,
       total: total ?? this.total,
       category: category ?? this.category,
@@ -67,6 +71,7 @@ class Dances {
       'id': id,
       'title': title,
       'country': country,
+      'region': region,
       'available': available,
       'total': total,
       'category': category.name,
@@ -84,6 +89,7 @@ class Dances {
       id: json['id'],
       title: json['title'],
       country: json['country'],
+      region: json['region'],
       available: json['available'] ?? 0,
       total: json['total'] ?? 0,
       category: Category.values.firstWhere(

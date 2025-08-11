@@ -4,6 +4,7 @@ import 'package:raw_threads/services/auth_service.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:async';
 
 class DanceInventoryProvider extends ChangeNotifier {
   final List<Dances> _dances = [];
@@ -12,7 +13,116 @@ class DanceInventoryProvider extends ChangeNotifier {
   final Map<String, Dances> _danceMap = {};
   List<Dances> get allDances => _danceMap.values.toList();
 
-  Dances ? getDanceById(String id) => _danceMap[id];
+  Dances? getDanceById(String id) => _danceMap[id];
+
+  StreamSubscription<DatabaseEvent>? _dancesSubscription;
+  String? _adminId;
+
+  Future<void> init(String adminId) async {
+    // Cancel any existing subscription first
+    await _dancesSubscription?.cancel();
+
+    _adminId = adminId;
+
+    // Load initial data once
+    await _loadFromFirebase();
+
+    // Set up listener for live updates
+    _dancesSubscription = FirebaseDatabase.instance
+      .ref('admins/$_adminId/dances')
+      .onValue
+      .listen((event) {
+        final dancesMap = event.snapshot.value as Map<dynamic, dynamic>?;
+
+        _dances.clear();
+        _danceMap.clear();
+
+        if (dancesMap != null) {
+          dancesMap.forEach((key, value) {
+            final dance = Dances.fromJson(Map<String, dynamic>.from(value));
+            _dances.add(dance);
+            _danceMap[key] = dance;
+          });
+        }
+        notifyListeners();
+      });
+  }
+
+  Future<void> _loadFromFirebase() async {
+    if (_adminId == null) return;
+
+    final snapshot = await FirebaseDatabase.instance
+        .ref('admins/$_adminId/dances')
+        .get();
+
+    if (snapshot.exists) {
+      final dancesMap = Map<String, dynamic>.from(snapshot.value as Map);
+      _dances.clear();
+      _danceMap.clear();
+
+      dancesMap.forEach((key, value) {
+        final dance = Dances.fromJson(Map<String, dynamic>.from(value));
+        _dances.add(dance);
+        _danceMap[key] = dance;
+      });
+
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadForAdmin(String adminId) async {
+    _dancesSubscription?.cancel();
+
+    final snapshot = await FirebaseDatabase.instance
+        .ref('admins/$adminId/dances')
+        .get();
+
+    if (snapshot.exists) {
+      final dancesMap = Map<String, dynamic>.from(snapshot.value as Map);
+      _dances.clear();
+      _dances.addAll(dancesMap.entries
+          .map((e) => Dances.fromJson(Map<String, dynamic>.from(e.value))));
+      
+      _danceMap.clear();
+      for (var dance in _dances) {
+        _danceMap[dance.id] = dance;
+      }
+      notifyListeners();
+    } else {
+      _dances.clear();
+      _danceMap.clear();
+      notifyListeners();
+    }
+
+    _dancesSubscription = FirebaseDatabase.instance
+        .ref('admins/$adminId/dances')
+        .onValue
+        .listen((event) {
+          final data = event.snapshot.value as Map<dynamic, dynamic>?;
+
+          if (data != null) {
+            _dances.clear();
+            _dances.addAll(data.entries
+                .map((e) => Dances.fromJson(Map<String, dynamic>.from(e.value))));
+            
+            _danceMap.clear();
+            for (var dance in _dances) {
+              _danceMap[dance.id] = dance;
+            }
+          } else {
+            _dances.clear();
+            _danceMap.clear();
+          }
+          notifyListeners();
+        });
+  }
+
+  @override
+  void dispose() {
+    _dancesSubscription?.cancel();
+    super.dispose();
+  }
+
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -37,11 +147,6 @@ class DanceInventoryProvider extends ChangeNotifier {
 
     final ref = FirebaseDatabase.instance.ref('admins/$adminId/dances/${dance.id}');
     await ref.set(dance.toJson());
-
-    _dances.add(dance);
-    _danceMap[dance.id] = dance;
-    await _saveLocally();
-    notifyListeners();
   }
 
   Future<void> delete(String id) async {
@@ -59,8 +164,7 @@ class DanceInventoryProvider extends ChangeNotifier {
     final adminId = await authService.value.getEffectiveAdminId();
     if (adminId == null) return;
 
-    final ref = FirebaseDatabase.instance
-        .ref('admins/$adminId/dances/${updated.id}');
+    final ref = FirebaseDatabase.instance.ref('admins/$adminId/dances/${updated.id}');
     await ref.set(updated.toJson());
 
     final index = _dances.indexWhere((d) => d.id == updated.id);

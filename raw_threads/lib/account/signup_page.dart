@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:raw_threads/services/auth_service.dart';
 import 'package:raw_threads/pages/real_pages/home_page.dart'; 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
 import 'package:raw_threads/firebase_options.dart';
 import 'package:raw_threads/classes/style_classes/primary_button.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
@@ -20,13 +21,21 @@ class _SignUpPageState extends State<SignUpPage> {
 
   List<bool> isSelected = [true, false];
   bool isLoading = false;
+  bool _firebaseInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    Firebase.initializeApp(
+    _initializeFirebase();
+  }
+
+  Future<void> _initializeFirebase() async {
+    await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    setState(() {
+      _firebaseInitialized = true;
+    });
   }
 
   @override
@@ -68,139 +77,194 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 
+  Future<void> _signUp() async {
+    final localContext = context;
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      String selectedRole = isSelected[0] ? 'user' : 'admin';
+
+      // Create account with role
+      await authService.value.createAccount(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        role: selectedRole,
+      );
+
+      // Wait for currentUser to be available
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      int waitCount = 0;
+      while (currentUser == null && waitCount < 10) {
+        await Future.delayed(const Duration(milliseconds: 300));
+        currentUser = FirebaseAuth.instance.currentUser;
+        waitCount++;
+      }
+
+      if (currentUser == null) {
+        throw Exception('User not logged in after sign up.');
+      }
+
+      // Update username after user is ready
+      await authService.value.updateUsername(
+        username: _usernameController.text.trim(),
+      );
+
+      if (!localContext.mounted) return;
+
+      Navigator.pushReplacement(
+        localContext,
+        MaterialPageRoute(
+          builder: (_) => HomePage(role: selectedRole),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(localContext).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (!_firebaseInitialized) {
+      // Show splash/loading while Firebase initializes
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: myColors.primary,
-      appBar: AppBar(backgroundColor: myColors.primary, iconTheme: IconThemeData(color: myColors.secondary),),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Text('Sign Up', style: TextStyle(fontSize: 48, color: myColors.secondary, fontFamily: 'Vogun', fontWeight: FontWeight.w500)),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _emailController,
-              style: TextStyle(
-                color: myColors.secondary, 
-                backgroundColor: myColors.primary,
+      appBar: AppBar(
+        backgroundColor: myColors.primary,
+        iconTheme: IconThemeData(color: myColors.secondary),
+      ),
+      resizeToAvoidBottomInset: true,  // adjust layout for keyboard
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Text(
+                'Sign Up',
+                style: TextStyle(
+                  fontSize: 48,
+                  color: myColors.secondary,
+                  fontFamily: 'Vogun',
+                  fontWeight: FontWeight.w500,
                 ),
-              decoration: InputDecoration(
-                labelText: 'Email', 
-                labelStyle: TextStyle(color: myColors.secondary),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0), 
-                  borderSide: BorderSide(
-                    color: myColors.secondary, 
-                    width: 2,
-                    ),
-                  ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                  borderSide: BorderSide(
-                    color: myColors.secondary, 
-                    width: 2,
-                    ),
-                  ), 
               ),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _passwordController,
-              style: TextStyle(
-                color: myColors.secondary, 
-                backgroundColor: myColors.primary,
+              const SizedBox(height: 20),
+              // Email TextField
+              TextField(
+                controller: _emailController,
+                style: TextStyle(
+                  color: myColors.secondary,
+                  backgroundColor: myColors.primary,
                 ),
-              decoration: InputDecoration(
-                labelText: 'Password', 
-                labelStyle: TextStyle(color: myColors.secondary),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0), 
-                  borderSide: BorderSide(
-                    color: myColors.secondary, 
-                    width: 2,
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  labelStyle: TextStyle(color: myColors.secondary),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                    borderSide: BorderSide(
+                      color: myColors.secondary,
+                      width: 2,
                     ),
                   ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                  borderSide: BorderSide(
-                    color: myColors.secondary, 
-                    width: 2,
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                    borderSide: BorderSide(
+                      color: myColors.secondary,
+                      width: 2,
                     ),
-                  ), 
-              ),
-              obscureText: true,
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _usernameController,
-              style: TextStyle(
-                color: myColors.secondary, 
-                backgroundColor: myColors.primary,
+                  ),
                 ),
-              decoration: InputDecoration(
-                labelText: 'Username', 
-                labelStyle: TextStyle(color: myColors.secondary),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0), 
-                  borderSide: BorderSide(
-                    color: myColors.secondary, 
-                    width: 2,
-                    ),
-                  ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                  borderSide: BorderSide(
-                    color: myColors.secondary, 
-                    width: 2,
-                    ),
-                  ), 
               ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildRoleButton('User', 0),
-                _buildRoleButton('Admin', 1),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Container(
-              margin: const EdgeInsets.only(top: 20, bottom: 20),
-              child: isLoading
-                  ? const CircularProgressIndicator()
-                  : PrimaryButton(
-                    label: 'Sign Up',
-                    color: myColors.secondary,
-                    color2: myColors.primary,
-                    onPressed: () async {
-                      final localContext = context;
-                      setState(() {
-                        isLoading = true;
-                      });
-                      try {
-                        String selectedRole = isSelected[0] ? 'user' : 'admin';
-
-                        await authService.value.createAccount(
-                          email: _emailController.text,
-                          password: _passwordController.text,
-                          role: selectedRole,
-                        );
-                        await authService.value.updateUsername(
-                          username: _usernameController.text,
-                        );
-
-                        if (!localContext.mounted) return;  
-                        Navigator.pushReplacement(localContext, MaterialPageRoute(builder: (_) => HomePage(role: selectedRole)));
-                      } catch (e) {
-                        ScaffoldMessenger.of(localContext).showSnackBar(SnackBar(content: Text('Error: $e')));
-                      }
-                    },
+              const SizedBox(height: 20),
+              // Password TextField
+              TextField(
+                controller: _passwordController,
+                style: TextStyle(
+                  color: myColors.secondary,
+                  backgroundColor: myColors.primary,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  labelStyle: TextStyle(color: myColors.secondary),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                    borderSide: BorderSide(
+                      color: myColors.secondary,
+                      width: 2,
+                    ),
                   ),
-            ),
-          ],
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                    borderSide: BorderSide(
+                      color: myColors.secondary,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                obscureText: true,
+              ),
+              const SizedBox(height: 20),
+              // Username TextField
+              TextField(
+                controller: _usernameController,
+                style: TextStyle(
+                  color: myColors.secondary,
+                  backgroundColor: myColors.primary,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Username',
+                  labelStyle: TextStyle(color: myColors.secondary),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                    borderSide: BorderSide(
+                      color: myColors.secondary,
+                      width: 2,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                    borderSide: BorderSide(
+                      color: myColors.secondary,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Role selector row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildRoleButton('User', 0),
+                  _buildRoleButton('Admin', 1),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Container(
+                margin: const EdgeInsets.only(top: 20, bottom: 20),
+                child: isLoading
+                    ? const CircularProgressIndicator()
+                    : PrimaryButton(
+                        label: 'Sign Up',
+                        color: myColors.secondary,
+                        color2: myColors.primary,
+                        onPressed: _signUp,
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );

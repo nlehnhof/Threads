@@ -7,16 +7,19 @@ class AppContextProvider extends ChangeNotifier {
   String? _danceId;
   String? _gender;
   String? _costumeId;
+  String? _adminCode;
 
   String? get adminId => _adminId;
   String? get danceId => _danceId;
   String? get gender => _gender;
   String? get costumeId => _costumeId;
+  String? get adminCode => _adminCode;
 
   void clearContext() {
     _danceId = null;
     _gender = null;
     _costumeId = null;
+    _adminCode = null;
     notifyListeners();
   }
 
@@ -40,6 +43,11 @@ class AppContextProvider extends ChangeNotifier {
 
   void setAdminId(String id) {
     _adminId = id;
+    notifyListeners();
+  }
+
+  void setAdminCode(String id) {
+    _adminCode = id;
     notifyListeners();
   }
 

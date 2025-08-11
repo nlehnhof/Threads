@@ -35,11 +35,6 @@ class _HomePageState extends State<HomePage> {
     _initUserData();
   }
 
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
   Future<void> _initUserData() async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return;
@@ -62,11 +57,12 @@ class _HomePageState extends State<HomePage> {
     if (_linkedAdminId != null) {
       if (mounted) {
         await context.read<ShowsProvider>().init(_linkedAdminId!);
-        await context.read<DanceInventoryProvider>().load();
+        await context.read<DanceInventoryProvider>().init(_linkedAdminId!);
       }
     }
-
+    if (mounted) {
     setState(() => _loading = false);
+    }
   }
 
   Future<void> _promptAdminLinking() async {
@@ -74,34 +70,95 @@ class _HomePageState extends State<HomePage> {
 
     await showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: const Text("Link to Admin"),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
-            hintText: "Enter Admin UID",
-          ),
+          decoration: const InputDecoration(hintText: "Enter Admin Code"),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
+            onPressed: () {
+              debugPrint('[DEBUG] Link admin dialog canceled.');
+              Navigator.of(ctx).pop();
+            },
             child: const Text("Cancel"),
           ),
           TextButton(
             onPressed: () async {
-              final adminId = controller.text.trim();
-              if (adminId.isNotEmpty) {
+              try {
+                final adminCode = controller.text.trim();
+                debugPrint('[DEBUG] Admin code entered: "$adminCode"');
+
+                if (adminCode.isEmpty) {
+                  debugPrint('[DEBUG] Admin code is empty, aborting linking.');
+                  return;
+                }
+
                 final currentUser = FirebaseAuth.instance.currentUser;
-                if (currentUser != null) {
+                if (currentUser == null) {
+                  debugPrint('[ERROR] No authenticated user found during linking.');
+                  return;
+                }
+                debugPrint('[DEBUG] Current user UID: ${currentUser.uid}');
+
+                debugPrint('[DEBUG] Fetching admins from database...');
+                final adminsSnapshot = await FirebaseDatabase.instance.ref('admins').get();
+
+                if (!adminsSnapshot.exists) {
+                  debugPrint('[DEBUG] No admins found in database.');
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('No admins found')),
+                  );
+                  return;
+                }
+
+                debugPrint('[DEBUG] Admins snapshot value: ${adminsSnapshot.value}');
+                final adminsMap = Map<String, dynamic>.from(adminsSnapshot.value as Map);
+
+                String? matchedAdminId;
+
+                adminsMap.forEach((key, value) {
+                  final adminData = Map<String, dynamic>.from(value);
+                  debugPrint('[DEBUG] Checking admin UID: $key with code: ${adminData['admincode']}');
+                  if (adminData['admincode'] == adminCode) {
+                    matchedAdminId = key;
+                  }
+                });
+
+                if (matchedAdminId != null) {
+                  debugPrint('[DEBUG] Matched admin UID: $matchedAdminId');
+
+                  debugPrint('[DEBUG] Updating user linkedAdminId...');
                   await FirebaseDatabase.instance
                       .ref('users/${currentUser.uid}')
-                      .update({'linkedAdminId': adminId});
-                  _linkedAdminId = adminId;
+                      .update({'linkedAdminId': matchedAdminId});
+                  debugPrint('[DEBUG] User linkedAdminId updated.');
+
+                  _linkedAdminId = matchedAdminId;
+
                   Navigator.of(ctx).pop();
-                  if (mounted) await context.read<ShowsProvider>().init(adminId);
-                  if (mounted) await context.read<DanceInventoryProvider>().load();
-                  setState(() {});
+
+                  if (mounted) {
+                    debugPrint('[DEBUG] Initializing providers with linked admin...');
+                    await context.read<ShowsProvider>().init(matchedAdminId!);
+                    await context.read<DanceInventoryProvider>().init(matchedAdminId!);
+                    setState(() {});
+                    debugPrint('[DEBUG] Providers initialized.');
+                  }
+                } else {
+                  debugPrint('[DEBUG] Invalid admin code entered.');
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Invalid Admin Code')),
+                  );
                 }
+              } catch (e, stack) {
+                debugPrint('[ERROR] Exception during admin linking: $e');
+                debugPrint(stack.toString());
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Error linking to admin')),
+                );
               }
             },
             child: const Text("Link"),
@@ -110,6 +167,8 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
+
 
   void _openAddShowOverlay() {
     showModalBottomSheet(
@@ -128,17 +187,13 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+
   void _editShow(Shows updatedShow) async {
     await context.read<ShowsProvider>().updateShow(updatedShow);
   }
 
   void _removeShow(Shows show) async {
     final showsProvider = context.read<ShowsProvider>();
-    final shows = showsProvider.shows;
-    final removedIndex = shows.indexWhere((s) => s.id == show.id);
-    
-    if (removedIndex == -1) return;
-
     await showsProvider.removeShow(show.id);
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -158,8 +213,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final danceProvider = context.watch<DanceInventoryProvider>();
     final showsProvider = context.watch<ShowsProvider>();
-    final List<Dances> allDances = danceProvider.dances;
-
+  
     if (_loading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -220,7 +274,7 @@ class _HomePageState extends State<HomePage> {
               child: ShowsList(
                 onRemoveShow: isAdmin ? _removeShow : null,
                 onEditShow: isAdmin ? _editShow : null,
-                allDances: allDances,
+                allDances: danceProvider.dances,
                 isAdmin: isAdmin,
                 shows: showsProvider.shows,
               ),

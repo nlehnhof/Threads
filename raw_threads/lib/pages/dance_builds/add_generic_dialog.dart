@@ -30,6 +30,7 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
   @override
   void initState() {
     super.initState();
+
     if (widget.dance != null) {
       final dance = widget.dance!;
       titleController.text = dance.title;
@@ -39,19 +40,28 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
       regionController.text = '';
       selectedLeftImage = dance.leftImagePath != null ? File(dance.leftImagePath!) : null;
       selectedRightImage = dance.rightImagePath != null ? File(dance.rightImagePath!) : null;
-    } else {
-      titleController.text = '';
-      totalController.text = '';
-      availableController.text = '';
-      countryController.text = '';
-      regionController.text = '';
-      selectedLeftImage = null;
-      selectedRightImage = null;
     }
+
+    // Add listeners to update form validation state on input changes
+    titleController.addListener(_onTextChanged);
+    totalController.addListener(_onTextChanged);
+    availableController.addListener(_onTextChanged);
+    countryController.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    setState(() {
+      // triggers rebuild so isFormValid is reevaluated
+    });
   }
 
   @override
   void dispose() {
+    titleController.removeListener(_onTextChanged);
+    totalController.removeListener(_onTextChanged);
+    availableController.removeListener(_onTextChanged);
+    countryController.removeListener(_onTextChanged);
+
     titleController.dispose();
     totalController.dispose();
     availableController.dispose();
@@ -75,11 +85,10 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
   }
 
   bool get isFormValid {
-    final valid = titleController.text.trim().isNotEmpty &&
+    return titleController.text.trim().isNotEmpty &&
         totalController.text.trim().isNotEmpty &&
         availableController.text.trim().isNotEmpty &&
         countryController.text.trim().isNotEmpty;
-    return valid;
   }
 
   @override
@@ -252,15 +261,15 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
                                 rightImagePath: selectedRightImage?.path,
                               )
                             : Dances(
-                              id: uuid.v4(),
-                              title: titleController.text.trim(),
-                              country: countryController.text.trim(),
-                              available: int.tryParse(availableController.text.trim()) ?? 0,
-                              total: int.tryParse(totalController.text.trim()) ?? 0,
-                              category: Category.prepped,
-                              leftImagePath: selectedLeftImage?.path,
-                              rightImagePath: selectedRightImage?.path,
-                            );
+                                id: uuid.v4(),
+                                title: titleController.text.trim(),
+                                country: countryController.text.trim(),
+                                available: int.tryParse(availableController.text.trim()) ?? 0,
+                                total: int.tryParse(totalController.text.trim()) ?? 0,
+                                category: Category.prepped,
+                                leftImagePath: selectedLeftImage?.path,
+                                rightImagePath: selectedRightImage?.path,
+                              );
                           Navigator.pop(context);
                           widget.onSubmit(danceToSave);
                         }
