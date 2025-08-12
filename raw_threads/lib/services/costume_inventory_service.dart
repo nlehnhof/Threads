@@ -117,13 +117,14 @@ class CostumeInventoryService {
   Future<StreamSubscription?> listenToCostumes({
     required String danceId,
     required String gender,
+    required String costumeId,
     required void Function(List<CostumePiece>) onUpdate,
   }) async {
     final adminId = await authService.value.getEffectiveAdminId();
     if (adminId == null) return null;
 
     final ref = FirebaseDatabase.instance
-        .ref('admins/$adminId/dances/$danceId/costumes/$gender');
+        .ref('admins/$adminId/dances/$danceId/costumes/$gender/$costumeId');
 
     return ref.onValue.listen((event) {
       final data = event.snapshot.value;

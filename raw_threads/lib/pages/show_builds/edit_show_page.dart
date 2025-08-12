@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:raw_threads/classes/main_classes/shows.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
-import 'package:raw_threads/classes/main_classes/teams.dart'; 
+// import 'package:raw_threads/classes/main_classes/teams.dart'; 
 import 'package:raw_threads/pages/show_builds/dance_selection_page.dart';
 import 'package:firebase_database/firebase_database.dart';
 
@@ -147,31 +147,31 @@ class _EditShowPageState extends State<EditShowPage> {
     Navigator.of(ctx).pop(updatedShow);
   }
 
-  Future<void> _syncDanceAssignmentsWithTeams() async {
-    final teamProvider = Provider.of<TeamProvider>(context, listen: false);
+  // Future<void> _syncDanceAssignmentsWithTeams() async {
+  //   final teamProvider = Provider.of<TeamProvider>(context, listen: false);
 
-    // Map teamId -> set of danceIds assigned
-    final Map<String, Set<String>> teamToDanceIds = {
-      for (var team in teamProvider.teams) team.id: <String>{}
-    };
+  //   // Map teamId -> set of danceIds assigned
+  //   final Map<String, Set<String>> teamToDanceIds = {
+  //     for (var team in teamProvider.teams) team.id: <String>{}
+  //   };
 
-    // Build assignments from danceStatusMap
-    for (var entry in danceStatusMap.entries) {
-      final danceId = entry.key;
-      final assignedTeamNames = entry.value.teams;
+  //   // Build assignments from danceStatusMap
+  //   for (var entry in danceStatusMap.entries) {
+  //     final danceId = entry.key;
+  //     final assignedTeamNames = entry.value.teams;
 
-      for (var teamName in assignedTeamNames) {
-        final team = teamProvider.teams.firstWhere(
-          (t) => t.title == teamName,
-          orElse: () => Teams(id: '', title: '', members: [], assigned: []),
-        );
-        if (team.id == '') continue; // Skip if no matching team found
-        teamToDanceIds[team.id]?.add(danceId);
-      }
-    }
+  //     for (var teamName in assignedTeamNames) {
+  //       final team = teamProvider.teams.firstWhere(
+  //         (t) => t.title == teamName,
+  //         orElse: () => Teams(id: '', title: '', members: [], assigned: []),
+  //       );
+  //       if (team.id == '') continue; // Skip if no matching team found
+  //       teamToDanceIds[team.id]?.add(danceId);
+  //     }
+  //   }
 
-    await teamProvider.updateDanceAssignments(teamToDanceIds);
-  }
+  //   await teamProvider.updateDanceAssignments(teamToDanceIds);
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -184,7 +184,7 @@ class _EditShowPageState extends State<EditShowPage> {
         .toList();
 
     // Use teamProvider.teams titles for multi-select options
-    final allTeamNames = teamProvider.teams.map((t) => t.title).toList();
+    // final allTeamNames = teamProvider.teams.map((t) => t.title).toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Show')),

@@ -6,6 +6,7 @@ import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/pages/costume_builds/costume_page.dart';
 import 'package:raw_threads/pages/dance_builds/add_generic_dialog.dart';
+import 'package:raw_threads/providers/app_context_provider.dart';
 
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
 import 'package:raw_threads/providers/costume_provider.dart';
@@ -64,7 +65,6 @@ class _GenericDancePageState extends State<GenericDancePage> {
   void _showAssignDanceToTeamDialog(BuildContext context) {
     final teamProvider = Provider.of<TeamProvider>(context, listen: false);
     final filteredTeams = teamProvider.teams.where((t) => t.title.trim().isNotEmpty).toList();
-    // Pre-fill with teams that already have this dance assigned
     final selectedTeamIds = <String>{
       for (final team in teamProvider.teams)
         if (team.assigned.contains(dance.id)) team.id
@@ -73,9 +73,8 @@ class _GenericDancePageState extends State<GenericDancePage> {
     showDialog(
       context: context,
       builder: (context) {
-        return StatefulBuilder( // Needed so the checkboxes can update within the dialog
+        return StatefulBuilder(
           builder: (context, setState) {
-            
             return AlertDialog(
               title: const Text('Assign Dance to Teams'),
               content: SizedBox(
@@ -114,11 +113,9 @@ class _GenericDancePageState extends State<GenericDancePage> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    // First clear this dance from all teams
                     for (final team in teamProvider.teams) {
                       await teamProvider.unassignDanceFromTeam(dance.id, team.id);
                     }
-                    // Then assign to selected ones
                     for (final teamId in selectedTeamIds) {
                       await teamProvider.assignDanceToTeam(dance.id, teamId);
                     }
@@ -134,14 +131,13 @@ class _GenericDancePageState extends State<GenericDancePage> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<DanceInventoryProvider>();
 
     final updatedDance = provider.getDanceById(dance.id);
     if (updatedDance != null) dance = updatedDance;
-    
+
     return Scaffold(
       backgroundColor: myColors.secondary,
       appBar: AppBar(
@@ -173,11 +169,11 @@ class _GenericDancePageState extends State<GenericDancePage> {
                       ),
                       TextButton(
                         onPressed: () async {
-                          Navigator.of(context).pop(); // Close dialog
+                          Navigator.of(context).pop();
                           await provider.delete(dance.id);
                           widget.onDelete(dance);
                           if (!context.mounted) return;
-                          Navigator.of(context).pop(); // Close this page
+                          Navigator.of(context).pop();
                         },
                         child: const Text('Delete', style: TextStyle(color: Colors.red)),
                       ),
@@ -186,19 +182,19 @@ class _GenericDancePageState extends State<GenericDancePage> {
                 );
               },
             ),
-            if (isAdmin)
-              TextButton(
-                onPressed: _editDancePage,
-                child: const Text(
-                  'Edit',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 17,
-                    fontFamily: 'Raleway',
-                  ),
+          if (isAdmin)
+            TextButton(
+              onPressed: _editDancePage,
+              child: const Text(
+                'Edit',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 17,
+                  fontFamily: 'Raleway',
                 ),
               ),
-          ],
+            ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(24),
@@ -282,6 +278,8 @@ class _GenericDancePageState extends State<GenericDancePage> {
   }
 
   Widget _buildButton(BuildContext context, String label) {
+    final adminId = Provider.of<AppContextProvider>(context, listen: false).adminId ?? '';
+
     return SizedBox(
       width: 337,
       height: 60,
@@ -290,14 +288,15 @@ class _GenericDancePageState extends State<GenericDancePage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => ChangeNotifierProvider( 
-              create: (_) => CostumesProvider(),
-              child: CostumePage(
-                role: widget.role,
-                dance: dance,
-                gender: label,
+              builder: (_) => ChangeNotifierProvider(
+                create: (_) => CostumesProvider(),
+                child: CostumePage(
+                  role: widget.role,
+                  dance: dance,
+                  gender: label,
+                  adminId: adminId,
+                ),
               ),
-            ),
             ),
           );
         },

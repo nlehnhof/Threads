@@ -6,7 +6,6 @@ import 'package:raw_threads/classes/main_classes/assignments.dart';
 import 'package:raw_threads/pages/assignment_builds/add_edit_assignments.dart';
 import 'package:raw_threads/providers/assignments_provider.dart';
 import 'package:raw_threads/providers/costume_provider.dart';
-import 'package:raw_threads/services/costume_inventory_service.dart';
 
 class AssignPage extends StatefulWidget {
   final CostumePiece costume;
@@ -39,32 +38,30 @@ class _AssignPageState extends State<AssignPage> {
 
   Future<void> _loadPathAndUpdateContext() async {
     final costumeProvider = context.read<CostumesProvider>();
-
-    // Try fast lookup from provider cache
-    var path = await costumeProvider.findPath(widget.costume.id);
-
-    // If not found locally, do full Firebase search
-    if (path == null) {
-      path = await CostumeInventoryService.instance
-          .findCostumePath(widget.costume.id);
-    }
+    final path = await costumeProvider.findCostumePath(widget.costume.id);
 
     if (path != null) {
       danceId = path['danceId'] ?? '';
       gender = path['gender'] ?? '';
-      final assignmentProvider = context.read<AssignmentProvider>();
-      assignmentProvider.updateContext(
-        costumeId: widget.costume.id,
-        danceId: danceId,
-        gender: gender,
-      );
+
+      if (mounted) {
+        final assignmentProvider = context.read<AssignmentProvider>();
+        assignmentProvider.updateContextWithContext(
+          context,
+          danceId: danceId,
+          gender: gender,
+          costumeId: widget.costume.id,
+        );
+      }
     } else {
       print("❌ Could not find path for costume ${widget.costume.id}");
       danceId = '';
       gender = '';
     }
 
-    setState(() => _loading = false);
+    if (mounted) {
+      setState(() => _loading = false);
+    }
   }
 
   Future<void> _addOrEditAssignment({Assignments? existing, int? index}) async {
@@ -87,7 +84,7 @@ class _AssignPageState extends State<AssignPage> {
       ),
     );
 
-    if (result == null && existing != null && index != null) {
+    if (result == null && existing != null) {
       await provider.deleteAssignment(existing);
     } else if (result != null) {
       if (existing != null) {
@@ -118,14 +115,13 @@ class _AssignPageState extends State<AssignPage> {
     final provider = context.watch<AssignmentProvider>();
     final assignments = provider.assignments;
 
+    // Filter assignments by user search query (case-insensitive)
     List<Assignments> filtered = assignments
-        .where((assignment) =>
-            assignment.user.toLowerCase().contains(searchQuery))
+        .where((a) => a.user.toLowerCase().contains(searchQuery.toLowerCase()))
         .toList();
 
     if (sortByUser) {
-      filtered.sort(
-          (a, b) => a.user.toLowerCase().compareTo(b.user.toLowerCase()));
+      filtered.sort((a, b) => a.user.toLowerCase().compareTo(b.user.toLowerCase()));
     }
 
     return Scaffold(
@@ -147,8 +143,7 @@ class _AssignPageState extends State<AssignPage> {
             padding: const EdgeInsets.all(8.0),
             child: TextField(
               decoration: const InputDecoration(hintText: "Search"),
-              onChanged: (value) =>
-                  setState(() => searchQuery = value.toLowerCase()),
+              onChanged: (value) => setState(() => searchQuery = value),
             ),
           ),
           Expanded(
@@ -160,8 +155,7 @@ class _AssignPageState extends State<AssignPage> {
                   title: Text('${assignment.number} ${widget.costume.title}'),
                   subtitle: Text('${assignment.size} | ${assignment.user}'),
                   onTap: isAdmin
-                      ? () => _addOrEditAssignment(
-                          existing: assignment, index: index)
+                      ? () => _addOrEditAssignment(existing: assignment, index: index)
                       : null,
                 );
               },

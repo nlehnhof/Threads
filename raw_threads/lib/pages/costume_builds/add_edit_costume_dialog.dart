@@ -103,7 +103,7 @@ class _AddEditCostumeDialogState extends State<AddEditCostumeDialog> {
     );
 
     widget.onSave(newPiece);
-    Navigator.of(context).pop(newPiece);
+    Navigator.pop(context);
   }
 
   Widget _buildImageWidget() {

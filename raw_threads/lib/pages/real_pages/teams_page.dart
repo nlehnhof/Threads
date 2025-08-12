@@ -93,8 +93,6 @@ class _TeamsPageState extends State<TeamsPage> {
     }
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<TeamProvider>();

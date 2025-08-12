@@ -14,12 +14,14 @@ class CostumePage extends StatefulWidget {
   final String role;
   final Dances dance;
   final String gender;
+  final String adminId;
 
   const CostumePage({
     super.key,
     required this.role,
     required this.dance,
     required this.gender,
+    required this.adminId,
   });
 
   @override
@@ -31,13 +33,26 @@ class _CostumePageState extends State<CostumePage> {
   bool get isAdmin => widget.role == 'admin';
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() async {
+    super.didChangeDependencies();
+
     final provider = context.read<CostumesProvider>();
-    provider.updateContext(widget.dance.id, widget.gender);
+    await provider.init(
+      adminId: widget.adminId,
+      danceId: widget.dance.id,
+      gender: widget.gender,
+    );
   }
 
-  Future<void> _addOrEditCostume({CostumePiece? existing, int? index}) async {
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   final provider = context.read<CostumesProvider>();
+  //   final costumes = provider.costumes;
+  //   provider.updateCostume(costume);
+  // }
+
+  Future<void> _addOrEditCostume({CostumePiece? existing}) async {
     final provider = context.read<CostumesProvider>();
 
     final result = await showDialog<CostumePiece?>(
@@ -45,12 +60,12 @@ class _CostumePageState extends State<CostumePage> {
       builder: (_) => AddEditCostumeDialog(
         existing: existing,
         allowDelete: existing != null,
-        onSave: (costume) => Navigator.of(context).pop(costume),
+        onSave: (costume) => Navigator.pop(context),
         role: widget.role,
       ),
     );
 
-    if (result == null && existing != null && index != null) {
+    if (result == null && existing != null) {
       await provider.deleteCostume(existing.id);
     } else if (result != null) {
       if (existing != null) {
@@ -133,7 +148,7 @@ class _CostumePageState extends State<CostumePage> {
       },
       onLongPress: () {
         if (isAdmin) {
-          _addOrEditCostume(existing: piece, index: index);
+          _addOrEditCostume(existing: piece);
         } else {
           _viewCostume(piece);
         }

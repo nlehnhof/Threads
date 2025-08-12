@@ -1,88 +1,169 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
-import 'package:raw_threads/services/costume_inventory_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class CostumesProvider extends ChangeNotifier {
+  String? _adminId;
   String? _danceId;
   String? _gender;
 
-  List<CostumePiece> _costumes = [];
+  final List<CostumePiece> _costumes = [];
   List<CostumePiece> get costumes => List.unmodifiable(_costumes);
 
-  StreamSubscription<dynamic>? _subscription;
+  StreamSubscription<DatabaseEvent>? _costumesSubscription;
   CostumesProvider();
 
-  final Map<String, Map<String, List<CostumePiece>>> _costumesByDance = {};
-
-    /// Find the danceId and gender for a costume by its ID.
-  Future<Map<String, String>?> findPath(String costumeId) async {
-    for (var danceEntry in _costumesByDance.entries) {
-      final danceId = danceEntry.key;
-      final genderMap = danceEntry.value;
-
-      for (var genderEntry in genderMap.entries) {
-        final gender = genderEntry.key;
-        final costumes = genderEntry.value;
-        
-        if (costumes.any((c) => c.id == costumeId)) {
-          return {
-            'danceId': danceId,
-            'gender': gender,
-          };
-        }
-      }
-    }
-    return null; // Not found
-  }
-
-  void updateContext(String? danceId, String? gender) {
-    if (_danceId == danceId && _gender == gender) return; // no change
+  Future<void> init({
+    required String adminId,
+    required String danceId,
+    required String gender,
+  }) async {
+    print("CostumesProvider init called with adminId=$adminId, danceId=$danceId, gender=$gender");
+    if (_adminId == adminId && _danceId == danceId && _gender == gender) return;
+  
+    _adminId = adminId;
     _danceId = danceId;
     _gender = gender;
 
-    _subscription?.cancel();
-    _costumes = [];
+    await _costumesSubscription?.cancel();
+    _costumes.clear();
+    notifyListeners();
 
-    if (_danceId != null && _gender != null) {
-      initialize();
-    } else {
+    await _loadFromFirebase();
+
+    _costumesSubscription = FirebaseDatabase.instance
+        .ref('admins/$_adminId/dances/$_danceId/costumes/$_gender')
+        .onValue
+        .listen((event) {
+          final data = event.snapshot.value;
+          _costumes.clear();
+
+          if (data != null && data is Map) {
+            data.forEach((key, value) {
+              try {
+                final costume = CostumePiece.fromJson(Map<String, dynamic>.from(value));
+                _costumes.add(costume);
+              } catch (e) {
+                print('error: $e');
+              }
+            });
+          }
+          notifyListeners();
+        });
+  }
+
+  Future<void> _loadFromFirebase() async {
+    if (_adminId == null || _danceId == null || _gender == null) return;
+
+    final snapshot = await FirebaseDatabase.instance
+        .ref('admins/$_adminId/dances/$_danceId/costumes/$_gender')
+        .get();
+
+    _costumes.clear();
+
+    if (snapshot.exists) {
+      final data = snapshot.value;
+      if (data != null && data is Map) {
+        data.forEach((key, value) {
+          try {
+            final costume = CostumePiece.fromJson(Map<String, dynamic>.from(value));
+            _costumes.add(costume);
+          } catch (e) {
+            // ignore
+          }
+        });
+      }
+    }
+    notifyListeners();
+  }
+
+  Future<void> addCostume(CostumePiece costume) async {
+    if (_adminId == null || _danceId == null || _gender == null) {
+      print("❌ Missing adminId, danceId, or gender; cannot add costume.");
+      return;
+    }
+
+    print("Adding costume ${costume.id} to admins/$_adminId/dances/$_danceId/costumes/$_gender");
+
+    final ref = FirebaseDatabase.instance
+        .ref('admins/$_adminId/dances/$_danceId/costumes/$_gender/${costume.id}');
+
+    try {
+      await ref.set(costume.toJson());
+      _costumes.add(costume);
+      notifyListeners();
+      print("✅ Costume added successfully.");
+    } catch (e) {
+      print("❌ Failed to add costume: $e");
+    }
+    notifyListeners();
+  }
+
+  Future<void> updateCostume(CostumePiece costume) async {
+    if (_adminId == null || _danceId == null || _gender == null) return;
+  
+    final ref = FirebaseDatabase.instance
+        .ref('admins/$_adminId/dances/$_danceId/costumes/$_gender/${costume.id}');
+
+    await ref.set(costume.toJson());
+
+    final index = _costumes.indexWhere((c) => c.id == costume.id);
+    if (index != -1) {
+      _costumes[index] = costume;
       notifyListeners();
     }
   }
 
-  Future<void> initialize() async {
-    if (_danceId == null || _gender == null) return;
+  Future<Map<String, String>?> findCostumePath(String costumeId) async {
+    if (_adminId == null || _adminId!.isEmpty) {
+      print("Admin Id is null or empty. Cannot find costume path.");
+      return null;
+    }
 
-    _subscription = await CostumeInventoryService.instance.listenToCostumes(
-      danceId: _danceId!,
-      gender: _gender!,
-      onUpdate: (updatedList) {
-        _costumes = updatedList;
-        notifyListeners();
-      },
-    );
-  }
+    final dancesRef = FirebaseDatabase.instance.ref('admins/$_adminId/dances');
+    final dancesSnap = await dancesRef.get();
 
-  Future<void> addCostume(CostumePiece costume) async {
-    print('Adding costume to dance $_danceId gender $_gender');
-    if (_danceId == null || _gender == null) return;
-    await CostumeInventoryService.instance.add(_danceId!, _gender!, costume);
-  }
+    if (!dancesSnap.exists) {
+      print("No dances found under admins/$_adminId/dances");
+      return null;
+    }
 
-  Future<void> updateCostume(CostumePiece costume) async {
-    if (_danceId == null || _gender == null) return;
-    await CostumeInventoryService.instance.update(_danceId!, _gender!, costume);
+    for (final danceEntry in dancesSnap.children) {
+      final danceId = danceEntry.key;
+      if (danceId == null || danceId.isEmpty) continue;
+
+      for (final genderEntry in ['Men', 'Women']) {
+        final costumesRef = FirebaseDatabase.instance
+            .ref('admins/$_adminId/dances/$danceId/costumes/$genderEntry/$costumeId');
+        final costumeSnap = await costumesRef.get();
+
+        if (costumeSnap.exists) {
+          print("Found costume.");
+          return {'danceId': danceId, 'gender': genderEntry};
+        }
+      }
+    }
+    print("Costume $costumeId not found in any dance/gender");
+    return null;
   }
 
   Future<void> deleteCostume(String costumeId) async {
-    if (_danceId == null || _gender == null) return;
-    await CostumeInventoryService.instance.delete(_danceId!, _gender!, costumeId);
+    if (_adminId == null || _danceId == null || _gender == null) return;
+
+    final ref = FirebaseDatabase.instance
+        .ref('admins/$_adminId/dances/$_danceId/costumes/$_gender/$costumeId');
+    
+    await ref.remove();
+  
+    _costumes.removeWhere((c) => c.id == costumeId);
+    notifyListeners();
   }
 
   @override
   void dispose() {
-    _subscription?.cancel();
+    _costumesSubscription?.cancel();
     super.dispose();
   }
 }

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
-import 'package:raw_threads/services/dance_inventory_service.dart';
-import 'repair_details_page.dart';
 import 'package:raw_threads/providers/costume_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:raw_threads/providers/app_context_provider.dart';
+import 'package:raw_threads/pages/repair_builds/repair_details_page.dart';
 
 class RepairSelectionPage extends StatefulWidget {
   final String role;
@@ -23,15 +23,27 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
   bool get isAdmin => widget.role == 'admin';
 
   @override
-  void initState() {
-    super.initState();
-    DanceInventoryService.instance.load().then((_) => setState(() {}));
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+  }
+
+  Future<void> _loadCostumes() async {
+    final adminId = context.read<AppContextProvider>().adminId;
+    if (adminId != null && selectedDance != null && selectedGender != null) {
+      await context
+          .read<CostumesProvider>()
+          .init(adminId: adminId, danceId: selectedDance!.id, gender: selectedGender!);
+      setState(() {
+        selectedCostume = null; // reset costume selection on dance/gender change
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final danceProvider = context.watch<DanceInventoryProvider>();
     final dances = danceProvider.dances;
+
     final costumesProvider = context.watch<CostumesProvider>();
     final costumesList = costumesProvider.costumes;
 
@@ -42,16 +54,17 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
         child: Column(
           children: [
             DropdownButton<Dances>(
+              isExpanded: true,
               hint: const Text('Select Dance'),
               value: selectedDance,
-              onChanged: (Dances? newValue) {
+              onChanged: (Dances? newValue) async {
                 setState(() {
                   selectedDance = newValue;
                   selectedGender = null;
                   selectedCostume = null;
                 });                
                 if (newValue != null && selectedGender != null) {
-                  context.read<CostumesProvider>().updateContext(newValue.id, selectedGender);
+                  await _loadCostumes();
                 }
               },
               items: dances.map((dance) {
@@ -64,15 +77,16 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
             const SizedBox(height: 16),
             if (selectedDance != null)
               DropdownButton<String>(
+                isExpanded: true,
                 hint: const Text('Select Gender'),
                 value: selectedGender,
-                onChanged: (String? newValue) {
+                onChanged: (String? newValue) async {
                   setState(() {
                     selectedGender = newValue;
                     selectedCostume = null;
                   });
                   if (selectedDance != null && newValue != null) {
-                    context.read<CostumesProvider>().updateContext(selectedDance!.id, newValue);
+                    await _loadCostumes();
                   }
                 },
                 items: const [

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:raw_threads/sidebar/sidebar.dart';
 import 'package:raw_threads/pages/show_builds/shows_list.dart';
 import 'package:raw_threads/pages/show_builds/new_show.dart';
-import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/classes/main_classes/shows.dart';
 
 import 'package:raw_threads/classes/style_classes/primary_button.dart';

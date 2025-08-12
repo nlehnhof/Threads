@@ -1,68 +1,79 @@
 import 'package:flutter/material.dart';
-import 'package:raw_threads/providers/costume_provider.dart';
-import 'package:raw_threads/classes/main_classes/costume_piece.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class AppContextProvider extends ChangeNotifier {
   String? _adminId;
-  String? _danceId;
-  String? _gender;
-  String? _costumeId;
   String? _adminCode;
 
   String? get adminId => _adminId;
-  String? get danceId => _danceId;
-  String? get gender => _gender;
-  String? get costumeId => _costumeId;
   String? get adminCode => _adminCode;
 
-  void clearContext() {
-    _danceId = null;
-    _gender = null;
-    _costumeId = null;
-    _adminCode = null;
-    notifyListeners();
+  bool _initialized = false;
+  bool get isInitialized => _initialized;
+
+  AppContextProvider() {
+    _initialize();
   }
 
-  /// Sets context by looking up danceId & gender dynamically
-  Future<void> setCostumeContextById(CostumePiece costume, CostumesProvider costumesProvider) async {
-    final result = await costumesProvider.findPath(costume.id);
-    if (result != null) {
-      _danceId = result['danceId'];
-      _gender = result['gender'];
-      _costumeId = costume.id;
+  Future<void> _initialize() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      // User not logged in, can't initialize adminId
+      _initialized = true;
       notifyListeners();
+      return;
     }
-  }
 
-  void setCostumeContext({required String danceId, required String gender, required String costumeId}) {
-    _danceId = danceId;
-    _gender = gender;
-    _costumeId = costumeId;
+    try {
+      // Step 1: Get the adminCode for the current user
+      final userSnap = await FirebaseDatabase.instance
+          .ref('users/${user.uid}/adminCode')
+          .get();
+
+      if (!userSnap.exists || userSnap.value == null) {
+        _initialized = true;
+        notifyListeners();
+        return;
+      }
+      _adminCode = userSnap.value as String;
+
+      // Step 2: Search /admins for a matching adminCode
+      final adminsSnap = await FirebaseDatabase.instance.ref('admins').get();
+
+      // Defensive check
+      if (!adminsSnap.exists) {
+        _initialized = true;
+        notifyListeners();
+        return;
+      }
+
+      for (final entry in adminsSnap.children) {
+        final codeSnap = entry.child('admincode');
+        if (codeSnap.exists && codeSnap.value == _adminCode) {
+          _adminId = entry.key;
+          break;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error initializing AppContextProvider: $e');
+    }
+
+    _initialized = true;
     notifyListeners();
   }
 
   void setAdminId(String id) {
     _adminId = id;
+    debugPrint('AppContextProvider.adminId set to $_adminId');
     notifyListeners();
   }
 
-  void setAdminCode(String id) {
-    _adminCode = id;
+  Future<void> refresh() async {
+    _initialized = false;
+    _adminId = null;
+    _adminCode = null;
     notifyListeners();
-  }
-
-  void setDanceId(String id) {
-    _danceId = id;
-    notifyListeners();
-  }
-
-  void setGender(String gender) {
-    _gender = gender;
-    notifyListeners();
-  }
-
-  void setCostumeId(String id) {
-    _costumeId = id;
-    notifyListeners();
+    await _initialize();
   }
 }

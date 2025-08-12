@@ -165,7 +165,7 @@ class _ShowItemState extends State<ShowItem> {
                           ],
                         ),
                       );
-                    }).toList(),
+                    }),
                 ],
               ),
               crossFadeState: isExpanded

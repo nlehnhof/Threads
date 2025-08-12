@@ -1,10 +1,8 @@
 import 'dart:convert';
-import 'package:raw_threads/classes/main_classes/costume_piece.dart';
-import 'package:raw_threads/services/auth_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:raw_threads/classes/main_classes/assignments.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AssignmentService {
   AssignmentService._privateConstructor();
@@ -13,21 +11,20 @@ class AssignmentService {
   List<Assignments> _cachedAssignments = [];
   List<Assignments> get assignments => List.unmodifiable(_cachedAssignments);
 
-  Future<void> add(String danceId, String gender, String costumeId, Assignments assignment) async {
-    if (danceId.isEmpty || gender.isEmpty) {
-      print("❌ Cannot add assignment: danceId or gender is empty");
+  /// Add a new assignment under the given admin, dance, gender, and costume
+  Future<void> add(String adminId, String danceId, String gender, String costumeId, Assignments assignment) async {
+    if (adminId.isEmpty || danceId.isEmpty || gender.isEmpty || costumeId.isEmpty) {
+      print("❌ Cannot add assignment: adminId, danceId, gender, or costumeId is empty");
       return;
-    } 
-    final adminId = await authService.value.getEffectiveAdminId();
-    if (adminId == null) return;
-    print(danceId);
+    }
+    
     final ref = FirebaseDatabase.instance
         .ref('admins/$adminId/dances/$danceId/costumes/$gender/$costumeId/assignments/${assignment.id}');
 
     await ref.set(assignment.toJson());
 
     final snapshot = await ref.get();
-    print(snapshot.exists ? 'Verified' : 'Error');
+    print(snapshot.exists ? 'Verified assignment added' : 'Error adding assignment');
   }
 
   Future<void> load(String costumeId) async {
@@ -39,9 +36,7 @@ class AssignmentService {
     }
 
     final decoded = json.decode(data);
-    _cachedAssignments = (decoded as List)
-        .map((item) => Assignments.fromJson(item))
-        .toList();
+    _cachedAssignments = (decoded as List).map((item) => Assignments.fromJson(item)).toList();
   }
 
   Future<void> save(String costumeId) async {
@@ -50,9 +45,9 @@ class AssignmentService {
     await prefs.setString('assignments_$costumeId', encoded);
   }
 
-  Future<void> update(String danceId, String gender, String costumeId, Assignments updatedAssignment) async {
-    final adminId = await authService.value.getEffectiveAdminId();
-    if (adminId == null) return;
+  /// Update an existing assignment
+  Future<void> update(String adminId, String danceId, String gender, String costumeId, Assignments updatedAssignment) async {
+    if (adminId.isEmpty) return;
 
     final ref = FirebaseDatabase.instance
         .ref('admins/$adminId/dances/$danceId/costumes/$gender/$costumeId/assignments/${updatedAssignment.id}');
@@ -60,9 +55,9 @@ class AssignmentService {
     await ref.set(updatedAssignment.toJson());
   }
 
-  Future<void> delete(String danceId, String gender, String costumeId, String assignmentId) async {
-    final adminId = await authService.value.getEffectiveAdminId();
-    if (adminId == null) return;
+  /// Delete an assignment by id
+  Future<void> delete(String adminId, String danceId, String gender, String costumeId, String assignmentId) async {
+    if (adminId.isEmpty) return;
 
     final ref = FirebaseDatabase.instance
         .ref('admins/$adminId/dances/$danceId/costumes/$gender/$costumeId/assignments/$assignmentId');
@@ -70,50 +65,15 @@ class AssignmentService {
     await ref.remove();
   }
 
-  /// Find the path of an assignment by ID.
-  /// Note: you must pass danceId, gender, and assignments list to this method, since they are needed.
-  Future<Map<String, String>?> findAssignmentPath(
-    String targetAssignmentId,
-    CostumePiece costume,
-    String danceId,
-    String gender,
-    List<Assignments> assignments,
-  ) async {
-    final adminId = await authService.value.getEffectiveAdminId();
-    if (adminId == null) return null;
-
-    final costumeSnap = await FirebaseDatabase.instance
-        .ref('admins/$adminId/dances/$danceId/costumes/$gender/')
-        .get();
-
-    final costumes = costumeSnap.value as Map?;
-
-    if (costumes == null) return null;
-
-    for (final costumeEntry in costumes.entries) {
-      final costumeId = costumeEntry.key;
-      final costumeData = costumeEntry.value;
-
-      if (assignments.any((a) => a.id == targetAssignmentId)) {
-        return {
-          'costumeId': costumeId,
-          'danceId': danceId,
-          'gender': gender,
-          'costumeData': costumeData,
-        };
-      }
-    }
-    return null;
-  }
-
+  /// Listen to assignment changes for a costume
   Future<StreamSubscription?> listenToAssignments({
+    required String adminId,
     required String danceId,
     required String gender,
     required String costumeId,
     required void Function(List<Assignments>) onUpdate,
   }) async {
-    final adminId = await authService.value.getEffectiveAdminId();
-    if (adminId == null) return null;
+    if (adminId.isEmpty) return null;
 
     final ref = FirebaseDatabase.instance
         .ref('admins/$adminId/dances/$danceId/costumes/$gender/$costumeId/assignments');
@@ -126,7 +86,7 @@ class AssignmentService {
 
         data.forEach((key, value) {
           final json = Map<String, dynamic>.from(value);
-          json['id'] = key;  // Set ID from key
+          json['id'] = key; // Set ID from key
           assignments.add(Assignments.fromJson(json));
         });
 
@@ -137,5 +97,16 @@ class AssignmentService {
         onUpdate([]);
       }
     });
+  }
+
+  /// Helper: Find adminId by adminCode (for your app context provider)
+  Future<String?> findAdminIdByAdminCode(String adminCode) async {
+    final snap = await FirebaseDatabase.instance.ref('admins').orderByChild('admincode').equalTo(adminCode).get();
+    if (snap.exists && snap.value is Map) {
+      // Return the first matching adminId key
+      final adminsMap = snap.value as Map;
+      return adminsMap.keys.first;
+    }
+    return null;
   }
 }
