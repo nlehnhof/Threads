@@ -1,19 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:provider/provider.dart';
+
+import 'package:raw_threads/account/app_state.dart';
+import 'package:raw_threads/providers/dance_inventory_provider.dart';
+import 'package:raw_threads/providers/shows_provider.dart';
 import 'package:raw_threads/sidebar/sidebar.dart';
 import 'package:raw_threads/pages/show_builds/shows_list.dart';
 import 'package:raw_threads/pages/show_builds/new_show.dart';
 import 'package:raw_threads/classes/main_classes/shows.dart';
-
 import 'package:raw_threads/classes/style_classes/primary_button.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
-
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
-
-import 'package:provider/provider.dart';
-import 'package:raw_threads/providers/dance_inventory_provider.dart';
-import 'package:raw_threads/providers/shows_provider.dart';
 
 class HomePage extends StatefulWidget {
   final String role;
@@ -24,48 +23,65 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  String? _linkedAdminId;
   bool get isAdmin => widget.role == 'admin';
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _initUserData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initUserData();
+    });
   }
 
   Future<void> _initUserData() async {
+    debugPrint('HomePage: Starting _initUserData');
     final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) return;
+    if (currentUser == null) {
+      setState(() => _loading = false);
+      return;
+    }
+
+    final appState = context.read<AppState>();
 
     if (isAdmin) {
-      _linkedAdminId = currentUser.uid;
+      debugPrint('User is admin, setting adminId to ${currentUser.uid}');
+      appState.setAdminId(currentUser.uid);
     } else {
-      final userSnapshot = await FirebaseDatabase.instance
+      debugPrint('User is NOT admin, checking linkedAdminId in database');
+      final userSnap = await FirebaseDatabase.instance
           .ref('users/${currentUser.uid}')
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 10));
 
-      if (userSnapshot.exists &&
-          userSnapshot.child('linkedAdminId').value != null) {
-        _linkedAdminId = userSnapshot.child('linkedAdminId').value as String;
+      final linkedAdminId = userSnap.exists && userSnap.child('linkedAdminId').value != null
+          ? userSnap.child('linkedAdminId').value as String
+          : null;
+
+      if (linkedAdminId != null) {
+        appState.setAdminId(linkedAdminId);
       } else {
+        appState.setAdminId(null);
         await _promptAdminLinking();
       }
     }
 
-    if (_linkedAdminId != null) {
-      if (mounted) {
-        await context.read<ShowsProvider>().init(_linkedAdminId!);
-        await context.read<DanceInventoryProvider>().init(_linkedAdminId!);
+    final adminId = appState.adminId;
+    if (adminId != null) {
+      try {
+        await context.read<ShowsProvider>().init();
+        await context.read<DanceInventoryProvider>().init();
+      } catch (e) {
+        debugPrint('Error initializing providers: $e');
       }
     }
-    if (mounted) {
-    setState(() => _loading = false);
-    }
+
+    if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _promptAdminLinking() async {
     final controller = TextEditingController();
+    final appState = context.read<AppState>();
 
     await showDialog(
       context: context,
@@ -78,86 +94,62 @@ class _HomePageState extends State<HomePage> {
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              debugPrint('[DEBUG] Link admin dialog canceled.');
-              Navigator.of(ctx).pop();
-            },
+            onPressed: () => Navigator.of(ctx).pop(),
             child: const Text("Cancel"),
           ),
           TextButton(
             onPressed: () async {
+              final adminCode = controller.text.trim();
+              if (adminCode.isEmpty) return;
+
+              final currentUser = FirebaseAuth.instance.currentUser;
+              if (currentUser == null) return;
+
               try {
-                final adminCode = controller.text.trim();
-                debugPrint('[DEBUG] Admin code entered: "$adminCode"');
-
-                if (adminCode.isEmpty) {
-                  debugPrint('[DEBUG] Admin code is empty, aborting linking.');
-                  return;
-                }
-
-                final currentUser = FirebaseAuth.instance.currentUser;
-                if (currentUser == null) {
-                  debugPrint('[ERROR] No authenticated user found during linking.');
-                  return;
-                }
-                debugPrint('[DEBUG] Current user UID: ${currentUser.uid}');
-
-                debugPrint('[DEBUG] Fetching admins from database...');
                 final adminsSnapshot = await FirebaseDatabase.instance.ref('admins').get();
-
                 if (!adminsSnapshot.exists) {
-                  debugPrint('[DEBUG] No admins found in database.');
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('No admins found')),
-                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('No admins found')),
+                    );
+                  }
                   return;
                 }
 
-                debugPrint('[DEBUG] Admins snapshot value: ${adminsSnapshot.value}');
                 final adminsMap = Map<String, dynamic>.from(adminsSnapshot.value as Map);
-
                 String? matchedAdminId;
-
                 adminsMap.forEach((key, value) {
                   final adminData = Map<String, dynamic>.from(value);
-                  debugPrint('[DEBUG] Checking admin UID: $key with code: ${adminData['admincode']}');
                   if (adminData['admincode'] == adminCode) {
                     matchedAdminId = key;
                   }
                 });
 
                 if (matchedAdminId != null) {
-                  debugPrint('[DEBUG] Matched admin UID: $matchedAdminId');
-
-                  debugPrint('[DEBUG] Updating user linkedAdminId...');
                   await FirebaseDatabase.instance
                       .ref('users/${currentUser.uid}')
                       .update({'linkedAdminId': matchedAdminId});
-                  debugPrint('[DEBUG] User linkedAdminId updated.');
-
-                  _linkedAdminId = matchedAdminId;
+                  appState.setAdminId(matchedAdminId);
 
                   Navigator.of(ctx).pop();
 
-                  if (mounted) {
-                    debugPrint('[DEBUG] Initializing providers with linked admin...');
-                    await context.read<ShowsProvider>().init(matchedAdminId!);
-                    await context.read<DanceInventoryProvider>().init(matchedAdminId!);
-                    setState(() {});
-                    debugPrint('[DEBUG] Providers initialized.');
-                  }
+                  await context.read<ShowsProvider>().init();
+                  await context.read<DanceInventoryProvider>().init();
+
+                  if (mounted) setState(() {});
                 } else {
-                  debugPrint('[DEBUG] Invalid admin code entered.');
+                  if (mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('Invalid Admin Code')),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (mounted) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Invalid Admin Code')),
+                    const SnackBar(content: Text('Error linking to admin')),
                   );
                 }
-              } catch (e, stack) {
-                debugPrint('[ERROR] Exception during admin linking: $e');
-                debugPrint(stack.toString());
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('Error linking to admin')),
-                );
               }
             },
             child: const Text("Link"),
@@ -166,8 +158,6 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
-
 
   void _openAddShowOverlay() {
     showModalBottomSheet(
@@ -185,7 +175,6 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
 
   void _editShow(Shows updatedShow) async {
     await context.read<ShowsProvider>().updateShow(updatedShow);
@@ -210,14 +199,28 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final danceProvider = context.watch<DanceInventoryProvider>();
-    final showsProvider = context.watch<ShowsProvider>();
-  
+    final appState = context.watch<AppState>();
+    final adminId = appState.adminId;
+
     if (_loading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
+
+    if (adminId == null) {
+      return const Scaffold(
+        body: Center(child: Text('Please link your account to an admin.')),
+      );
+    }
+
+    final danceProvider = context.watch<DanceInventoryProvider?>();
+    if (danceProvider == null) {
+      return const Scaffold(
+        body: Center(child: Text('Please link your account to an admin.')),
+      );
+    }
+    final showsProvider = context.watch<ShowsProvider>();
 
     return Scaffold(
       backgroundColor: const Color(0xFFEBEFEE),
@@ -225,10 +228,7 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: myColors.primary,
         title: Row(
           children: [
-            Image.asset(
-              'assets/threadline_logo.png',
-              height: 30,
-            ),
+            Image.asset('assets/threadline_logo.png', height: 30),
             Text(
               "Threadline",
               style: TextStyle(

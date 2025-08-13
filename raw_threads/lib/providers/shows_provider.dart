@@ -4,18 +4,20 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:raw_threads/classes/main_classes/shows.dart';
 
 class ShowsProvider extends ChangeNotifier {
+  final String adminId;
   final List<Shows> _shows = [];
   List<Shows> get shows => List.unmodifiable(_shows);
 
   StreamSubscription<DatabaseEvent>? _showsSubscription;
-  String? _adminId;
+
+  ShowsProvider({
+    required this.adminId,
+  });
 
   // Initialize and start listening for changes for the given adminId
-  Future<void> init(String adminId) async {
+  Future<void> init() async {
     // Cancel existing subscription if any
     await _showsSubscription?.cancel();
-
-    _adminId = adminId;
 
     await load();
 
@@ -38,10 +40,9 @@ class ShowsProvider extends ChangeNotifier {
   }
   
   Future<void> load() async {
-    if (_adminId == null) return;
 
     final snapshot = await FirebaseDatabase.instance
-        .ref('admins/$_adminId/shows')
+        .ref('admins/$adminId/shows')
         .get();
 
     if (snapshot.exists) {
@@ -56,8 +57,6 @@ class ShowsProvider extends ChangeNotifier {
   }
 
   Future<void> addShow(Shows show) async {
-    if (_adminId == null) return;
-
     // Avoid duplicate IDs
     if (_shows.any((s) => s.id == show.id)) return;
 
@@ -65,27 +64,24 @@ class ShowsProvider extends ChangeNotifier {
     notifyListeners();
 
     await FirebaseDatabase.instance
-        .ref('admins/$_adminId/shows/${show.id}')
+        .ref('admins/$adminId/shows/${show.id}')
         .set(show.toJson());
   }
 
   Future<void> updateShow(Shows updatedShow) async {
-    if (_adminId == null) return;
-
     final index = _shows.indexWhere((s) => s.id == updatedShow.id);
     if (index != -1) {
       _shows[index] = updatedShow;
       notifyListeners();
 
       await FirebaseDatabase.instance
-          .ref('admins/$_adminId/shows/${updatedShow.id}')
+          .ref('admins/$adminId/shows/${updatedShow.id}')
           .set(updatedShow.toJson());
     }
   }
 
   Future<void> removeShow(String showId) async {
-    if (_adminId == null) return;
-
+    
     Shows? removed = _shows.cast<Shows?>().firstWhere(
       (s) => s?.id == showId,
       orElse: () => null,
@@ -96,7 +92,7 @@ class ShowsProvider extends ChangeNotifier {
     notifyListeners();
 
     await FirebaseDatabase.instance
-        .ref('admins/$_adminId/shows/$showId')
+        .ref('admins/$adminId/shows/$showId')
         .remove();
   }
 

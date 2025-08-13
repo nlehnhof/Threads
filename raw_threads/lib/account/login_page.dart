@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:raw_threads/firebase_options.dart';
 import 'package:raw_threads/services/auth_service.dart';
 import 'package:raw_threads/pages/real_pages/home_page.dart';
 import 'package:raw_threads/classes/style_classes/primary_button.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
+import 'package:raw_threads/account/app_state.dart';
+import 'package:provider/provider.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -21,9 +21,6 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
-    Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
   }
 
   @override
@@ -117,29 +114,39 @@ class _LoginPageState extends State<LoginPage> {
                             email: _emailController.text,
                             password: _passwordController.text,
                           );
-                          String? role = await AuthService().getRole();
-                          
-                          if (!localContext.mounted) return;
 
-                          if (role == 'admin') {
-                            Navigator.pushReplacement(localContext, MaterialPageRoute(builder: (_) => const HomePage(role: 'admin')));
-                          } else if (role == 'user') {
-                            Navigator.pushReplacement(localContext, MaterialPageRoute(builder: (_) => const HomePage(role: 'user')));
+                          // Initialize AppState after login success
+                          if (localContext.mounted) { 
+                          await localContext.read<AppState>().initialize();
+
+                          final role = localContext.read<AppState>().role;
+
+                          if (role == 'admin' || role == 'user') {
+                            Navigator.pushReplacement(
+                              localContext,
+                              MaterialPageRoute(builder: (_) => HomePage(role: role!)),
+                            );
                           } else {
-                            ScaffoldMessenger.of(localContext).showSnackBar(const SnackBar(content: Text('Role not recognized')));
+                            ScaffoldMessenger.of(localContext).showSnackBar(
+                              const SnackBar(content: Text('Role not recognized')),
+                            );
+                          }
                           }
                         } catch (e) {
-                          ScaffoldMessenger.of(localContext).showSnackBar(SnackBar(content: Text('Error: $e')));
+                          ScaffoldMessenger.of(localContext).showSnackBar(
+                            SnackBar(content: Text('Error: $e')),
+                          );
                         } finally {
                           if (mounted) {
                             setState(() {
                               isLoading = false;
-                           });
+                            });
                           }
                         }
                       },
-                    ),
-              ),          
+      
+              ), 
+            ),         
           ],
         ),
       ),

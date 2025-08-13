@@ -1,165 +1,154 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
-import 'package:raw_threads/classes/main_classes/costume_piece.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:raw_threads/classes/main_classes/costume_piece.dart';
 
 class CostumesProvider extends ChangeNotifier {
-  String? _adminId;
-  String? _danceId;
-  String? _gender;
+  final String adminId;
+
+  String? _currentDanceId;
+  String? _currentGender;
+
+  bool _initialized = false;
+  bool get initialized => _initialized;
 
   final List<CostumePiece> _costumes = [];
   List<CostumePiece> get costumes => List.unmodifiable(_costumes);
 
   StreamSubscription<DatabaseEvent>? _costumesSubscription;
-  CostumesProvider();
 
-  Future<void> init({
-    required String adminId,
-    required String danceId,
-    required String gender,
-  }) async {
-    print("CostumesProvider init called with adminId=$adminId, danceId=$danceId, gender=$gender");
-    if (_adminId == adminId && _danceId == danceId && _gender == gender) return;
-  
-    _adminId = adminId;
-    _danceId = danceId;
-    _gender = gender;
+  CostumesProvider({required this.adminId});
 
+  /// Initialize with danceId and gender (can be called multiple times
+  /// to switch the context to a new dance/gender).
+  Future<void> init({required String danceId, required String gender}) async {
+    if (_initialized && _currentDanceId == danceId && _currentGender == gender) return; 
+    
+    _initialized = false;
+    notifyListeners();
+
+    await setDanceAndGender(danceId, gender);
+
+    _initialized = true;
+    notifyListeners();
+  }
+
+  /// Set or update the current dance and gender.
+  /// Cancels old subscription and creates new listener on Firebase.
+  Future<void> setDanceAndGender(String danceId, String gender) async {
+    if (_currentDanceId == danceId && _currentGender == gender) return;
+
+    _currentDanceId = danceId;
+    _currentGender = gender;
+
+    // Cancel previous subscription if any
     await _costumesSubscription?.cancel();
+
     _costumes.clear();
     notifyListeners();
 
-    await _loadFromFirebase();
-
     _costumesSubscription = FirebaseDatabase.instance
-        .ref('admins/$_adminId/dances/$_danceId/costumes/$_gender')
+        .ref('admins/$adminId/dances/$danceId/costumes/$gender')
         .onValue
         .listen((event) {
-          final data = event.snapshot.value;
-          _costumes.clear();
+      final data = event.snapshot.value;
+      _costumes.clear();
 
-          if (data != null && data is Map) {
-            data.forEach((key, value) {
-              try {
-                final costume = CostumePiece.fromJson(Map<String, dynamic>.from(value));
-                _costumes.add(costume);
-              } catch (e) {
-                print('error: $e');
-              }
-            });
-          }
-          notifyListeners();
-        });
-  }
-
-  Future<void> _loadFromFirebase() async {
-    if (_adminId == null || _danceId == null || _gender == null) return;
-
-    final snapshot = await FirebaseDatabase.instance
-        .ref('admins/$_adminId/dances/$_danceId/costumes/$_gender')
-        .get();
-
-    _costumes.clear();
-
-    if (snapshot.exists) {
-      final data = snapshot.value;
       if (data != null && data is Map) {
         data.forEach((key, value) {
           try {
             final costume = CostumePiece.fromJson(Map<String, dynamic>.from(value));
             _costumes.add(costume);
           } catch (e) {
-            // ignore
+            if (kDebugMode) {
+              print('Error parsing costume: $e');
+            }
           }
         });
       }
+      notifyListeners();
+    });
+  }
+
+  Future<Map<String, String>?> findCostumePath(String costumeId, String adminId) async {
+    final db = FirebaseDatabase.instance.ref('admins/$adminId/dances');
+
+    final snapshot = await db.get();
+    if (!snapshot.exists) return null;
+
+    final dancesData = snapshot.value;
+    if (dancesData == null || dancesData is! Map) return null;
+
+    for (final danceEntry in dancesData.entries) {
+      final danceId = danceEntry.key;
+      final danceValue = danceEntry.value;
+
+      if (danceValue is Map && danceValue.containsKey('costumes')) {
+        final costumesMap = danceValue['costumes'];
+
+        if (costumesMap is Map) {
+          for (final genderEntry in costumesMap.entries) {
+            final gender = genderEntry.key;
+            final genderCostumes = genderEntry.value;
+
+            if (genderCostumes is Map && genderCostumes.containsKey(costumeId)) {
+              // Found the costume
+              return {'danceId': danceId, 'gender': gender};
+            }
+          }
+        }
+      }
     }
-    notifyListeners();
+    return null; // Not found
   }
 
   Future<void> addCostume(CostumePiece costume) async {
-    if (_adminId == null || _danceId == null || _gender == null) {
-      print("❌ Missing adminId, danceId, or gender; cannot add costume.");
-      return;
+    if (_currentDanceId == null || _currentGender == null) {
+      throw Exception('Dance ID and Gender must be set before adding costumes.');
     }
-
-    print("Adding costume ${costume.id} to admins/$_adminId/dances/$_danceId/costumes/$_gender");
 
     final ref = FirebaseDatabase.instance
-        .ref('admins/$_adminId/dances/$_danceId/costumes/$_gender/${costume.id}');
+        .ref('admins/$adminId/dances/$_currentDanceId/costumes/$_currentGender/${costume.id}');
 
-    try {
-      await ref.set(costume.toJson());
-      _costumes.add(costume);
-      notifyListeners();
-      print("✅ Costume added successfully.");
-    } catch (e) {
-      print("❌ Failed to add costume: $e");
-    }
+    await ref.set(costume.toJson());
+    // _costumes.add(costume);
     notifyListeners();
   }
 
   Future<void> updateCostume(CostumePiece costume) async {
-    if (_adminId == null || _danceId == null || _gender == null) return;
-  
+    if (_currentDanceId == null || _currentGender == null) {
+      throw Exception('Dance ID and Gender must be set before updating costumes.');
+    }
+
     final ref = FirebaseDatabase.instance
-        .ref('admins/$_adminId/dances/$_danceId/costumes/$_gender/${costume.id}');
+        .ref('admins/$adminId/dances/$_currentDanceId/costumes/$_currentGender/${costume.id}');
 
     await ref.set(costume.toJson());
 
-    final index = _costumes.indexWhere((c) => c.id == costume.id);
-    if (index != -1) {
-      _costumes[index] = costume;
-      notifyListeners();
-    }
-  }
-
-  Future<Map<String, String>?> findCostumePath(String costumeId) async {
-    if (_adminId == null || _adminId!.isEmpty) {
-      print("Admin Id is null or empty. Cannot find costume path.");
-      return null;
-    }
-
-    final dancesRef = FirebaseDatabase.instance.ref('admins/$_adminId/dances');
-    final dancesSnap = await dancesRef.get();
-
-    if (!dancesSnap.exists) {
-      print("No dances found under admins/$_adminId/dances");
-      return null;
-    }
-
-    for (final danceEntry in dancesSnap.children) {
-      final danceId = danceEntry.key;
-      if (danceId == null || danceId.isEmpty) continue;
-
-      for (final genderEntry in ['Men', 'Women']) {
-        final costumesRef = FirebaseDatabase.instance
-            .ref('admins/$_adminId/dances/$danceId/costumes/$genderEntry/$costumeId');
-        final costumeSnap = await costumesRef.get();
-
-        if (costumeSnap.exists) {
-          print("Found costume.");
-          return {'danceId': danceId, 'gender': genderEntry};
-        }
-      }
-    }
-    print("Costume $costumeId not found in any dance/gender");
-    return null;
+    // final index = _costumes.indexWhere((c) => c.id == costume.id);
+    // if (index != -1) {
+    //   _costumes[index] = costume;
+    //   notifyListeners();
+    // }
   }
 
   Future<void> deleteCostume(String costumeId) async {
-    if (_adminId == null || _danceId == null || _gender == null) return;
+    if (_currentDanceId == null || _currentGender == null) {
+      throw Exception('Dance ID and Gender must be set before deleting costumes.');
+    }
 
     final ref = FirebaseDatabase.instance
-        .ref('admins/$_adminId/dances/$_danceId/costumes/$_gender/$costumeId');
-    
+        .ref('admins/$adminId/dances/$_currentDanceId/costumes/$_currentGender/$costumeId');
+
     await ref.remove();
-  
+
     _costumes.removeWhere((c) => c.id == costumeId);
     notifyListeners();
   }
+
+  /// Optionally provide a getter to current danceId and gender if needed
+  String? get currentDanceId => _currentDanceId;
+  String? get currentGender => _currentGender;
 
   @override
   void dispose() {

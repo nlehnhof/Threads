@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
+import 'package:raw_threads/providers/costume_provider.dart';
 import 'package:uuid/uuid.dart';
 
 class AddEditCostumeDialog extends StatefulWidget {
@@ -77,7 +78,7 @@ class _AddEditCostumeDialogState extends State<AddEditCostumeDialog> {
     final turnIn = _turnInController.text.trim();
     final available = int.tryParse(_availableController.text.trim()) ?? 0;
     final total = int.tryParse(_totalController.text.trim()) ?? 0;
-
+    
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Title cannot be empty')),
@@ -103,7 +104,6 @@ class _AddEditCostumeDialogState extends State<AddEditCostumeDialog> {
     );
 
     widget.onSave(newPiece);
-    Navigator.pop(context);
   }
 
   Widget _buildImageWidget() {

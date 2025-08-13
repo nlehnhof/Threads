@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 
-import 'package:raw_threads/providers/app_context_provider.dart';
+import 'package:raw_threads/account/app_state.dart';
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
 import 'package:raw_threads/providers/shows_provider.dart';
 import 'package:raw_threads/providers/teams_provider.dart';
-import 'package:raw_threads/providers/costume_provider.dart';
 import 'package:raw_threads/providers/assignments_provider.dart';
+import 'package:raw_threads/providers/costume_provider.dart';
 
 import 'firebase_options.dart';
 import 'package:raw_threads/pages/real_pages/welcome_page.dart';
+import 'package:raw_threads/pages/real_pages/home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,8 +20,9 @@ void main() async {
   );
 
   runApp(
-    ChangeNotifierProvider(create: (_) => AppContextProvider(),
-    child: const MyApp(),
+    ChangeNotifierProvider(
+      create: (_) => AppState(),
+      child: const MyApp(),
     ),
   );
 }
@@ -30,28 +32,40 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final appContext = context.watch<AppContextProvider>();
+    final appState = context.watch<AppState>();
+    final adminId = appState.adminId;
+    final role = appState.role;
 
-    if (!appContext.isInitialized) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+    if (adminId == null || role == null) {
+      return const MaterialApp(home: WelcomePage());
     }
 
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => DanceInventoryProvider()),
-        ChangeNotifierProvider(create: (_) => ShowsProvider()),
-        ChangeNotifierProvider(create: (_) => TeamProvider()),
-        ChangeNotifierProvider(create: (_) => CostumesProvider()),
-        ChangeNotifierProvider(create: (_) => AssignmentProvider()),
+        ChangeNotifierProvider<CostumesProvider>(
+          create: (_) => CostumesProvider(adminId: adminId),
+        ),
+        ChangeNotifierProvider<DanceInventoryProvider>(
+          create: (_) => DanceInventoryProvider(adminId: adminId)..init(),
+        ),
+        ChangeNotifierProvider<ShowsProvider>(
+          create: (_) => ShowsProvider(adminId: adminId)..init(),
+        ),
+        ChangeNotifierProvider<TeamProvider>(
+          create: (_) => TeamProvider(adminId: adminId)..init(),
+        ),
+        ChangeNotifierProvider<AssignmentProvider>(
+          create: (_) => AssignmentProvider(adminId: adminId),
+        ),
       ],
       child: MaterialApp(
+        debugShowCheckedModeBanner: false,
         title: 'Raw Threads',
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightGreen),
+          primarySwatch: Colors.green,
+          scaffoldBackgroundColor: const Color(0xFFEBEFEE),
         ),
-        home: const WelcomePage(),
+        home: HomePage(role: role),
       ),
     );
   }

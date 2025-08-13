@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:raw_threads/account/app_state.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
 import 'package:raw_threads/classes/main_classes/assignments.dart';
@@ -38,7 +39,9 @@ class _AssignPageState extends State<AssignPage> {
 
   Future<void> _loadPathAndUpdateContext() async {
     final costumeProvider = context.read<CostumesProvider>();
-    final path = await costumeProvider.findCostumePath(widget.costume.id);
+    final adminId = context.read<AppState>().adminId;
+    if (adminId == null) return;
+    final path = await costumeProvider.findCostumePath(widget.costume.id, adminId);
 
     if (path != null) {
       danceId = path['danceId'] ?? '';
@@ -46,8 +49,7 @@ class _AssignPageState extends State<AssignPage> {
 
       if (mounted) {
         final assignmentProvider = context.read<AssignmentProvider>();
-        assignmentProvider.updateContextWithContext(
-          context,
+        assignmentProvider.setContext(
           danceId: danceId,
           gender: gender,
           costumeId: widget.costume.id,
@@ -85,12 +87,18 @@ class _AssignPageState extends State<AssignPage> {
     );
 
     if (result == null && existing != null) {
-      await provider.deleteAssignment(existing);
+      if (mounted) {
+      await provider.deleteAssignment(existing.id);
+      }
     } else if (result != null) {
       if (existing != null) {
+        if (mounted) {
         await provider.updateAssignment(result);
+        }
       } else {
+        if (mounted) {
         await provider.addAssignment(result);
+        }
       }
     }
   }

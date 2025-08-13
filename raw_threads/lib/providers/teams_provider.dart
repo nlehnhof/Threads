@@ -10,6 +10,8 @@ const uuid = Uuid();
 class TeamProvider with ChangeNotifier {
   final DatabaseReference _dbRef = FirebaseDatabase.instance.ref();
   final _auth = FirebaseAuth.instance;
+  final String adminId;
+
   List<Teams> teams = [];
   String? role;
   String? adminCode;
@@ -22,6 +24,22 @@ class TeamProvider with ChangeNotifier {
 
   StreamSubscription<DatabaseEvent>? _membersSub;
   StreamSubscription<DatabaseEvent>? _teamsSub;
+
+  TeamProvider({required this.adminId});
+
+  Future<void> init() async {
+    isLoading = true;
+    notifyListeners();
+
+    try {
+      await loadTeamData();
+    } catch (e) {
+      print('Error initializing TeamProvider: $e');
+    }
+
+    isLoading = false;
+    notifyListeners();
+  }
 
   Future<void> loadTeams() async {
     if (adminCode == null) return;

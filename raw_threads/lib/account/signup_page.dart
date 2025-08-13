@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:raw_threads/services/auth_service.dart';
 import 'package:raw_threads/pages/real_pages/home_page.dart'; 
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
-import 'package:raw_threads/firebase_options.dart';
 import 'package:raw_threads/classes/style_classes/primary_button.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
+import 'package:raw_threads/account/app_state.dart';
+import 'package:provider/provider.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -21,21 +21,11 @@ class _SignUpPageState extends State<SignUpPage> {
 
   List<bool> isSelected = [true, false];
   bool isLoading = false;
-  bool _firebaseInitialized = false;
+  final _firebaseInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeFirebase();
-  }
-
-  Future<void> _initializeFirebase() async {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    setState(() {
-      _firebaseInitialized = true;
-    });
   }
 
   @override
@@ -110,6 +100,8 @@ class _SignUpPageState extends State<SignUpPage> {
       await authService.value.updateUsername(
         username: _usernameController.text.trim(),
       );
+
+      await localContext.read<AppState>().initialize();
 
       if (!localContext.mounted) return;
 

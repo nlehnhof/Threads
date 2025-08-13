@@ -6,6 +6,7 @@ import 'package:collection/collection.dart';
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:raw_threads/account/app_state.dart';
 
 class TeamsPage extends StatefulWidget {
   const TeamsPage({super.key});
@@ -20,6 +21,7 @@ class _TeamsPageState extends State<TeamsPage> {
   @override
   void initState() {
     super.initState();
+    // Load initial team data on page load
     context.read<TeamProvider>().loadTeamData();
   }
 
@@ -33,7 +35,10 @@ class _TeamsPageState extends State<TeamsPage> {
     final code = _adminCodeController.text.trim();
     print("[DEBUG] _linkAdminCode called with code: '$code'");
 
+    final appState = context.read<AppState>();
+    final currentAdminId = appState.adminId;
     final user = FirebaseAuth.instance.currentUser;
+
     if (user == null) {
       print("[DEBUG] No authenticated user found. Aborting.");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -41,7 +46,14 @@ class _TeamsPageState extends State<TeamsPage> {
       );
       return;
     }
-    print("[DEBUG] Current user UID: ${user.uid}");
+
+    if (currentAdminId == null) {
+      print("[DEBUG] No current adminId in AppState. Aborting.");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No admin ID found in app state')),
+      );
+      return;
+    }
 
     final dbRef = FirebaseDatabase.instance.ref();
 
@@ -53,26 +65,22 @@ class _TeamsPageState extends State<TeamsPage> {
           .equalTo(code)
           .get();
 
-      print("[DEBUG] adminSnapshot exists: ${adminSnapshot.exists}");
-      print("[DEBUG] adminSnapshot value: ${adminSnapshot.value}");
-
       if (adminSnapshot.exists) {
         final adminsMap = adminSnapshot.value as Map<dynamic, dynamic>;
-        print("[DEBUG] adminsMap keys: ${adminsMap.keys}");
         final adminUid = adminsMap.keys.first as String;
+
         print("[DEBUG] Found admin UID: $adminUid");
 
-        print("[DEBUG] Updating user's linkedAdminId to: $adminUid");
+        // Update the user's linkedAdminId in the DB
         await dbRef.child('users/${user.uid}').update({'linkedAdminId': adminUid});
         print("[DEBUG] User's linkedAdminId updated.");
 
-        print("[DEBUG] Reloading TeamProvider data...");
-        await provider.loadTeamData();
-        print("[DEBUG] TeamProvider data reloaded.");
+        // Update the global appState adminId to this linked adminUid
+        appState.setAdminId(adminUid);
 
-        print("[DEBUG] Initializing DanceInventoryProvider for adminUid...");
-        await context.read<DanceInventoryProvider>().init(adminUid);
-        print("[DEBUG] DanceInventoryProvider initialized.");
+        // Reload teams and dances for the new admin
+        await provider.loadTeamData();
+        await context.read<DanceInventoryProvider>().init();
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Successfully linked to admin $code')),
@@ -92,6 +100,7 @@ class _TeamsPageState extends State<TeamsPage> {
       );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

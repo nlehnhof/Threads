@@ -9,19 +9,18 @@ import 'package:raw_threads/pages/assignment_builds/assign_page.dart';
 
 import 'package:raw_threads/providers/assignments_provider.dart';
 import 'package:raw_threads/providers/costume_provider.dart';
+import 'package:raw_threads/account/app_state.dart';
 
 class CostumePage extends StatefulWidget {
   final String role;
   final Dances dance;
   final String gender;
-  final String adminId;
 
   const CostumePage({
     super.key,
     required this.role,
     required this.dance,
     required this.gender,
-    required this.adminId,
   });
 
   @override
@@ -29,28 +28,22 @@ class CostumePage extends StatefulWidget {
 }
 
 class _CostumePageState extends State<CostumePage> {
-  String get genderKey => widget.gender == 'Men' ? 'Men' : 'Women';
   bool get isAdmin => widget.role == 'admin';
 
   @override
-  void didChangeDependencies() async {
+  void didChangeDependencies() {
     super.didChangeDependencies();
 
-    final provider = context.read<CostumesProvider>();
-    await provider.init(
-      adminId: widget.adminId,
+    final costumesProvider = context.read<CostumesProvider>();
+    final adminId = context.read<AppState>().adminId;
+    if (adminId == null) return;
+
+    // Initialize costumesProvider with current danceId and gender.
+    costumesProvider.init(
       danceId: widget.dance.id,
       gender: widget.gender,
     );
   }
-
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   final provider = context.read<CostumesProvider>();
-  //   final costumes = provider.costumes;
-  //   provider.updateCostume(costume);
-  // }
 
   Future<void> _addOrEditCostume({CostumePiece? existing}) async {
     final provider = context.read<CostumesProvider>();
@@ -60,7 +53,7 @@ class _CostumePageState extends State<CostumePage> {
       builder: (_) => AddEditCostumeDialog(
         existing: existing,
         allowDelete: existing != null,
-        onSave: (costume) => Navigator.pop(context),
+        onSave: (costume) => Navigator.pop(context, costume),
         role: widget.role,
       ),
     );
@@ -133,16 +126,22 @@ class _CostumePageState extends State<CostumePage> {
 
     return GestureDetector(
       onTap: () {
+        final assignmentProvider = context.read<AssignmentProvider>();
+
+        // Set current dance/gender/costume context inside AssignmentProvider
+        assignmentProvider.setContext(
+          danceId: widget.dance.id,
+          gender: widget.gender,
+          costumeId: piece.id,
+        );
+
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ChangeNotifierProvider(
-              create: (_) => AssignmentProvider(),
-              child: AssignPage(
-                costume: piece, 
-                role: widget.role,
-              ), 
-            ), 
+            builder: (_) => AssignPage(
+              costume: piece,
+              role: widget.role,
+            ),
           ),
         );
       },

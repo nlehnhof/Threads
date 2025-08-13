@@ -6,7 +6,8 @@ import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/pages/costume_builds/costume_page.dart';
 import 'package:raw_threads/pages/dance_builds/add_generic_dialog.dart';
-import 'package:raw_threads/providers/app_context_provider.dart';
+// import 'package:raw_threads/providers/app_context_provider.dart';
+import 'package:raw_threads/account/app_state.dart';
 
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
 import 'package:raw_threads/providers/costume_provider.dart';
@@ -134,8 +135,8 @@ class _GenericDancePageState extends State<GenericDancePage> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<DanceInventoryProvider>();
-
     final updatedDance = provider.getDanceById(dance.id);
+    
     if (updatedDance != null) dance = updatedDance;
 
     return Scaffold(
@@ -277,29 +278,31 @@ class _GenericDancePageState extends State<GenericDancePage> {
     );
   }
 
+  // Remove the adminId parameter from _buildButton
   Widget _buildButton(BuildContext context, String label) {
-    final adminId = Provider.of<AppContextProvider>(context, listen: false).adminId ?? '';
+    final adminId = context.read<AppState>().adminId;
+    final costumesProvider = context.watch<CostumesProvider>();
 
     return SizedBox(
       width: 337,
       height: 60,
       child: ElevatedButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ChangeNotifierProvider(
-                create: (_) => CostumesProvider(),
-                child: CostumePage(
-                  role: widget.role,
-                  dance: dance,
-                  gender: label,
-                  adminId: adminId,
-                ),
-              ),
-            ),
-          );
-        },
+        onPressed: adminId == null
+            ? null
+            : () async {
+              await costumesProvider.init(danceId: dance.id, gender: label);
+              
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CostumePage(
+                        role: widget.role,
+                        dance: dance,
+                        gender: label,
+                      ),
+                    ),
+                );
+              },
         style: ElevatedButton.styleFrom(
           backgroundColor: myColors.primary,
           foregroundColor: Colors.white,

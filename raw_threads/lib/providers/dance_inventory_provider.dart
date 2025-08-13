@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
-import 'package:raw_threads/services/auth_service.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:async';
 
 class DanceInventoryProvider extends ChangeNotifier {
+  final String adminId;
   final List<Dances> _dances = [];
   List<Dances> get dances => List.unmodifiable(_dances);
 
@@ -16,20 +16,21 @@ class DanceInventoryProvider extends ChangeNotifier {
   Dances? getDanceById(String id) => _danceMap[id];
 
   StreamSubscription<DatabaseEvent>? _dancesSubscription;
-  String? _adminId;
+  
+  DanceInventoryProvider({
+    required this.adminId,
+  });
 
-  Future<void> init(String adminId) async {
+  Future<void> init() async {
     // Cancel any existing subscription first
     await _dancesSubscription?.cancel();
-
-    _adminId = adminId;
 
     // Load initial data once
     await _loadFromFirebase();
 
     // Set up listener for live updates
     _dancesSubscription = FirebaseDatabase.instance
-      .ref('admins/$_adminId/dances')
+      .ref('admins/$adminId/dances')
       .onValue
       .listen((event) {
         final dancesMap = event.snapshot.value as Map<dynamic, dynamic>?;
@@ -49,10 +50,8 @@ class DanceInventoryProvider extends ChangeNotifier {
   }
 
   Future<void> _loadFromFirebase() async {
-    if (_adminId == null) return;
-
     final snapshot = await FirebaseDatabase.instance
-        .ref('admins/$_adminId/dances')
+        .ref('admins/$adminId/dances')
         .get();
 
     if (snapshot.exists) {
@@ -70,7 +69,7 @@ class DanceInventoryProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadForAdmin(String adminId) async {
+  Future<void> loadForAdmin() async {
     _dancesSubscription?.cancel();
 
     final snapshot = await FirebaseDatabase.instance
@@ -142,16 +141,16 @@ class DanceInventoryProvider extends ChangeNotifier {
   }
 
   Future<void> add(Dances dance) async {
-    final adminId = await authService.value.getEffectiveAdminId();
-    if (adminId == null) return;
+    // final adminId = await authService.value.getEffectiveAdminId();
+    // if (adminId == null) return;
 
     final ref = FirebaseDatabase.instance.ref('admins/$adminId/dances/${dance.id}');
     await ref.set(dance.toJson());
   }
 
   Future<void> delete(String id) async {
-    final adminId = await authService.value.getEffectiveAdminId();
-    if (adminId == null) return;
+    // final adminId = await authService.value.getEffectiveAdminId();
+    // if (adminId == null) return;
 
     await FirebaseDatabase.instance.ref('admins/$adminId/dances/$id').remove();
     _dances.removeWhere((d) => d.id == id);
@@ -161,9 +160,6 @@ class DanceInventoryProvider extends ChangeNotifier {
   }
 
   Future<void> update(Dances updated) async {
-    final adminId = await authService.value.getEffectiveAdminId();
-    if (adminId == null) return;
-
     final ref = FirebaseDatabase.instance.ref('admins/$adminId/dances/${updated.id}');
     await ref.set(updated.toJson());
 

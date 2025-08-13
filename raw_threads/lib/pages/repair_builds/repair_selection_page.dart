@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:raw_threads/account/app_state.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
 import 'package:raw_threads/providers/costume_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:raw_threads/providers/app_context_provider.dart';
 import 'package:raw_threads/pages/repair_builds/repair_details_page.dart';
 
 class RepairSelectionPage extends StatefulWidget {
@@ -22,17 +22,14 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
 
   bool get isAdmin => widget.role == 'admin';
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-  }
-
   Future<void> _loadCostumes() async {
-    final adminId = context.read<AppContextProvider>().adminId;
+    final adminId = context.read<AppState>().adminId;
     if (adminId != null && selectedDance != null && selectedGender != null) {
+      // Properly init costumesProvider with danceId and gender
       await context
           .read<CostumesProvider>()
-          .init(adminId: adminId, danceId: selectedDance!.id, gender: selectedGender!);
+          .init(danceId: selectedDance!.id, gender: selectedGender!);
+
       setState(() {
         selectedCostume = null; // reset costume selection on dance/gender change
       });
@@ -62,7 +59,8 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
                   selectedDance = newValue;
                   selectedGender = null;
                   selectedCostume = null;
-                });                
+                });
+                // Only load costumes if gender already selected
                 if (newValue != null && selectedGender != null) {
                   await _loadCostumes();
                 }
@@ -85,6 +83,7 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
                     selectedGender = newValue;
                     selectedCostume = null;
                   });
+                  // Load costumes only if dance is selected
                   if (selectedDance != null && newValue != null) {
                     await _loadCostumes();
                   }
@@ -98,6 +97,7 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
             if (selectedGender != null)
               costumesList.isNotEmpty
                   ? DropdownButton<CostumePiece>(
+                      isExpanded: true,
                       hint: const Text('Select Costume Piece'),
                       value: selectedCostume,
                       onChanged: (CostumePiece? newValue) {
