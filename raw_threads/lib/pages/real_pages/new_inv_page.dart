@@ -65,7 +65,7 @@ class _DanceInventoryPageState extends State<DanceInventoryPage> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             child: Column(
               children: [
                 // SEARCH BAR

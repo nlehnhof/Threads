@@ -17,6 +17,8 @@ class RepairPage extends StatefulWidget {
 }
 
 class _RepairPageState extends State<RepairPage> {
+  bool get isAdmin => widget.role == 'admin';
+  
   @override
   void initState() {
     super.initState();
@@ -36,24 +38,11 @@ class _RepairPageState extends State<RepairPage> {
       backgroundColor: myColors.secondary,
       appBar: AppBar(
         backgroundColor: myColors.secondary,
-        title: Row(
-          children: [
-            Image.asset('assets/threadline_logo.png', height: 30),
-            const SizedBox(width: 8),
-            Text(
-              "Threadline",
-              style: TextStyle(
-                color: myColors.primary,
-                fontSize: 25,
-                fontFamily: 'Vogun',
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
+        title: Image.asset('assets/logotype_green.png', height: 30),
         centerTitle: false,
         elevation: 0,
         actions: [
+          if (isAdmin)
           TextButton(
             onPressed: () {
               Navigator.push(
