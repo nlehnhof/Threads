@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
-import 'package:raw_threads/providers/costume_provider.dart';
 import 'package:uuid/uuid.dart';
 
 class AddEditCostumeDialog extends StatefulWidget {

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:raw_threads/pages/real_pages/welcome_page.dart';
-import 'package:raw_threads/sidebar/sidebar_item.dart';
-import 'package:raw_threads/pages/real_pages/home_page.dart'; 
+import 'package:raw_threads/pages/real_pages/home_page.dart';
 import 'package:raw_threads/pages/real_pages/new_inv_page.dart';
 import 'package:raw_threads/pages/real_pages/repair_page.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-// Assuming you have a ProfilePage
-import 'package:raw_threads/pages/real_pages/teams_page.dart'; // Assuming you have a TeamPage
+import 'package:raw_threads/pages/real_pages/profile_page.dart';
+import 'package:raw_threads/pages/real_pages/teams_page.dart';
+import 'package:raw_threads/sidebar/sidebar_item.dart';
 
 class Sidebar extends StatelessWidget {
   final String role;
@@ -20,74 +20,91 @@ class Sidebar extends StatelessWidget {
       child: SafeArea(
         child: Column(
           children: [
-            // Close (X) button in the top right
+            // Close button
             Padding(
               padding: const EdgeInsets.only(top: 16, right: 16),
               child: Align(
                 alignment: Alignment.topRight,
                 child: IconButton(
-                  icon: Icon(
-                    Icons.close, 
-                    color: Colors.white, 
-                    size: 35,
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).pop(); // Close the drawer
-                  },
+                  icon: const Icon(Icons.close, color: Colors.white, size: 35),
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
               ),
             ),
 
-            const SizedBox(height: 55), // Optional top spacing
+            const SizedBox(height: 55),
 
-            // Top section: Home, Inventory, Repairs, Teams, Chats (with 16 height spacing)
+            // Top section items
             ...[
-              SidebarItem(destinationBuilder: () => HomePage(role: role), label: 'Home'),
-              SidebarItem(destinationBuilder: () => DanceInventoryPage(role: role), label: 'Dance Inventory'),
-              SidebarItem(destinationBuilder: () => RepairPage(role), label: 'Repairs'),
-              SidebarItem(destinationBuilder: () => TeamsPage(), label: 'Teams'),
+              SidebarItem(
+                  destinationBuilder: () => HomePage(role: role),
+                  image: 'assets/home.png'),
+              SidebarItem(
+                  destinationBuilder: () => DanceInventoryPage(role: role),
+                  image: 'assets/inventory.png'),
+              SidebarItem(
+                  destinationBuilder: () => RepairPage(role: role),
+                  image: 'assets/repairs.png'),
+              SidebarItem(
+                  destinationBuilder: () => TeamsPage(),
+                  image: 'assets/teams.png'),
             ].expand((item) => [
-              item,
-              const SizedBox(height: 10), // 16px space between items
-            ]).toList()
-              ..removeLast(), // remove final spacer
+                  item,
+                  const SizedBox(height: 10),
+                ]).toList()
+              ..removeLast(),
 
-            const Spacer(), // Push the next section to the bottom
+            const Spacer(),
 
-            // SidebarItem(destinationBuilder: () => const ProfilePage(), label: 'Profile'),
-            SidebarItem(destinationBuilder: () => 
-                AlertDialog(
-                  backgroundColor: myColors.primary,
-                  title: Text('Logout?', style: TextStyle(fontFamily: 'Vogun', fontSize: 24, color: myColors.secondary)),
-                  actions: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        TextButton(
-                          onPressed: () async {
-                            Navigator.pop(context); // close dialog first
-                            // Add sign out here if using Firebase Auth
-                            await FirebaseAuth.instance.signOut();
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (_) => WelcomePage()),
-                            );
-                          },
-                          child: Text(
-                            'Logout',
-                            style: TextStyle(fontSize: 18, color: myColors.secondary),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: Text('Cancel', style: TextStyle(fontSize: 18, color: Colors.red)),
-                          ),
-                      ],
+            // Bottom section
+            SidebarItem(
+                destinationBuilder: () => ProfilePage(role: role),
+                image: 'assets/profile.png'),
+            const SizedBox(height: 10),
+            SidebarItem(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    backgroundColor: myColors.primary,
+                    title: Text(
+                      'Logout?',
+                      style: TextStyle(
+                          fontFamily: 'Vogun',
+                          fontSize: 24,
+                          color: myColors.secondary),
                     ),
-                  ],
-                  ), 
-                  label: 'Logout'),
-            
+                    actions: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton(
+                            onPressed: () async {
+                              Navigator.pop(context); // close dialog first
+                              await FirebaseAuth.instance.signOut();
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => WelcomePage()),
+                              );
+                            },
+                            child: Text('Logout',
+                                style: TextStyle(
+                                    fontSize: 18, color: myColors.secondary)),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child:
+                                const Text('Cancel', style: TextStyle(fontSize: 18, color: Colors.red)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+              image: 'assets/settings.png',
+            ),
             const SizedBox(height: 24),
           ],
         ),

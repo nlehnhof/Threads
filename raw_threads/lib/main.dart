@@ -8,6 +8,8 @@ import 'package:raw_threads/providers/shows_provider.dart';
 import 'package:raw_threads/providers/teams_provider.dart';
 import 'package:raw_threads/providers/assignments_provider.dart';
 import 'package:raw_threads/providers/costume_provider.dart';
+import 'package:raw_threads/providers/issues_provider.dart';
+import 'package:raw_threads/providers/repair_provider.dart';
 
 import 'firebase_options.dart';
 import 'package:raw_threads/pages/real_pages/welcome_page.dart';
@@ -56,6 +58,12 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<AssignmentProvider>(
           create: (_) => AssignmentProvider(adminId: adminId),
+        ),
+        ChangeNotifierProvider<IssuesProvider>(
+          create: (_) => IssuesProvider(adminId: adminId)..init(),
+        ),
+        ChangeNotifierProvider<RepairProvider>(
+          create: (_) => RepairProvider(adminId: adminId)..init(),
         ),
       ],
       child: MaterialApp(

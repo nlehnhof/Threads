@@ -124,13 +124,19 @@ class CostumesProvider extends ChangeNotifier {
         .ref('admins/$adminId/dances/$_currentDanceId/costumes/$_currentGender/${costume.id}');
 
     await ref.set(costume.toJson());
-
-    // final index = _costumes.indexWhere((c) => c.id == costume.id);
-    // if (index != -1) {
-    //   _costumes[index] = costume;
-    //   notifyListeners();
-    // }
   }
+
+  /// Get a costume by ID. Returns null if not found.
+  CostumePiece getCostumeById(String costumeId) {
+    return _costumes.firstWhere((c) => c.id == costumeId);
+  }
+
+  /// Optional helper to get just the costume name/title
+  String getCostumeNameById(String costumeId) {
+    final costume = getCostumeById(costumeId);
+    return costume.title;
+  }
+
 
   Future<void> deleteCostume(String costumeId) async {
     if (_currentDanceId == null || _currentGender == null) {

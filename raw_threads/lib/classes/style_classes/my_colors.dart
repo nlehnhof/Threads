@@ -8,6 +8,7 @@ class MyColors {
   final Color click;
   final Color disabled;
   final Color selected;
+  final Color completed;
 
   const MyColors({
     required this.primary,
@@ -17,6 +18,7 @@ class MyColors {
     required this.click,
     required this.disabled,
     required this.selected,
+    required this.completed,
   });
 }
 
@@ -29,4 +31,5 @@ const myColors = MyColors(
   hover: Color(0xFFD4DAD8),
   click: Color(0x33191B1A),
   disabled: Color(0xFFC8CEC9),
+  completed: Color.fromARGB(135, 90, 118, 91),
 );

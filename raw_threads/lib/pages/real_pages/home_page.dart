@@ -228,16 +228,7 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: myColors.primary,
         title: Row(
           children: [
-            Image.asset('assets/threadline_logo.png', height: 30),
-            Text(
-              "Threadline",
-              style: TextStyle(
-                color: myColors.secondary,
-                fontSize: 16,
-                fontFamily: 'Vogun',
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Image.asset('assets/logotype_white.png', height: 30),
           ],
         ),
         centerTitle: false,

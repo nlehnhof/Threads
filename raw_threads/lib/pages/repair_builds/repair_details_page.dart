@@ -1,24 +1,34 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:raw_threads/classes/main_classes/issues.dart';
+import 'package:provider/provider.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
+import 'package:raw_threads/classes/main_classes/repairs.dart';
+import 'package:raw_threads/providers/repair_provider.dart';
+import 'package:raw_threads/providers/issues_provider.dart';
+import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'repair_summary_page.dart';
+import 'package:uuid/uuid.dart';
+
+final uuid = Uuid();
 
 class RepairDetailsPage extends StatefulWidget {
   final Dances dance;
   final CostumePiece costume;
   final String role;
+  final String gender;
   final String? repairKey;
+  final String costumeTitle;
 
   const RepairDetailsPage(
     this.role, {
     super.key,
     required this.dance,
     required this.costume,
+    required this.gender,
+    required this.costumeTitle,
     this.repairKey,
   });
 
@@ -27,11 +37,6 @@ class RepairDetailsPage extends StatefulWidget {
 }
 
 class _RepairDetailsPageState extends State<RepairDetailsPage> {
-  final _auth = FirebaseAuth.instance;
-  final _dbRef = FirebaseDatabase.instance.ref();
-
-  String? adminId;
-
   List<Map<String, dynamic>> issueOptions = [];
   File? photo;
 
@@ -43,72 +48,55 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
 
   bool get isAdmin => widget.role == 'admin';
 
+  Repairs? existingRepair;
+
   @override
   void initState() {
     super.initState();
-    _initUserAndLoadData();
+    _loadRepair();
+    _listenIssues();
   }
 
-  Future<void> _initUserAndLoadData() async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    if (isAdmin) {
-      adminId = user.uid;
-    } else {
-      final adminSnap = await _dbRef.child('users').child(user.uid).child('adminId').get();
-      adminId = adminSnap.exists ? adminSnap.value as String : null;
-    }
-
-    if (adminId != null) {
-      await loadGlobalIssues();
-      await loadRepairData();
-    }
-  }
-
-  Future<void> loadGlobalIssues() async {
-    if (adminId == null) return;
-    final snapshot = await _dbRef.child('admins').child(adminId!).child('issues').get();
-    if (snapshot.exists) {
-      final data = Map<String, dynamic>.from(snapshot.value as Map);
-      setState(() {
-        issueOptions = data.entries.map((entry) {
-          final map = Map<String, dynamic>.from(entry.value);
-          map['selected'] = false;
-          map['image'] = map['imagePath'];
-          return map;
+  void _loadRepair() {
+    final provider = context.read<RepairProvider>();
+    if (widget.repairKey != null) {
+      final repair = provider.getRepairById(widget.repairKey!);
+      if (repair != null) {
+        existingRepair = repair;
+        nameController.text = repair.name;
+        emailController.text = repair.email;
+        costumeNumberController.text = repair.number;
+        commentController.text = repair.comments ?? '';
+        issueOptions = repair.issues.map((i) {
+          return {
+            'title': i.title,
+            'image': i.image,
+            'selected': true,
+          };
         }).toList();
-      });
-    } else {
-      setState(() => issueOptions = []);
+      }
     }
   }
 
-  Future<void> loadRepairData() async {
-    if (adminId == null) return;
-    final key = '${widget.dance.id}_${widget.costume.title}';
-    final snapshot = await _dbRef.child('admins').child(adminId!).child('repairs').child(key).get();
-
-    if (snapshot.exists) {
-      final data = Map<String, dynamic>.from(snapshot.value as Map);
+  void _listenIssues() {
+    final issuesProvider = Provider.of<IssuesProvider>(context, listen: false);
+    issuesProvider.addListener(() {
+      final updatedIssues = issuesProvider.allIssues.map((i) {
+        final existing = issueOptions.firstWhere(
+          (opt) => opt['title'] == i.title,
+          orElse: () => {'title': i.title, 'image': i.image, 'selected': false},
+        );
+        return {
+          'title': i.title,
+          'image': i.image,
+          'selected': existing['selected'] ?? false,
+        };
+      }).toList();
 
       setState(() {
-        nameController.text = data['name'] ?? '';
-        teamController.text = data['team'] ?? '';
-        emailController.text = data['email'] ?? '';
-        costumeNumberController.text = data['costumeNumbers'] ?? '';
-        commentController.text = data['comments'] ?? '';
-        photo = (data['photoPath'] != null && (data['photoPath'] as String).isNotEmpty)
-            ? File(data['photoPath'])
-            : null;
-
-        // Set selected issues based on saved repair data
-        List<dynamic> savedIssues = data['selectedIssues'] ?? [];
-        for (var issue in issueOptions) {
-          issue['selected'] = savedIssues.any((saved) => saved['title'] == issue['title']);
-        }
+        issueOptions = updatedIssues;
       });
-    }
+    });
   }
 
   Future<void> pickImage() async {
@@ -134,59 +122,7 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
 
     final file = await picker.pickImage(source: source);
     if (file != null) {
-      setState(() {
-        photo = File(file.path);
-      });
-    }
-  }
-
-  Future<File?> compressImage(File file) async {
-    final targetPath = file.path.replaceFirst('.jpg', '_thumb.jpg');
-    final compressedFile = await FlutterImageCompress.compressAndGetFile(
-      file.absolute.path,
-      targetPath,
-      quality: 50,
-      minWidth: 200,
-      minHeight: 200,
-    );
-
-    return compressedFile != null ? File(compressedFile.path) : null;
-  }
-
-  Future<void> saveRepairData() async {
-    if (adminId == null) return;
-
-    final selectedIssues = issueOptions
-        .where((issue) => issue['selected'] == true)
-        .map((issue) => {
-              'title': issue['title'],
-              'imagePath': issue['image'],
-            })
-        .toList();
-
-    final repairData = {
-      'danceId': widget.dance.id,
-      'danceTitle': widget.dance.title,
-      'costumeTitle': widget.costume.title,
-      'selectedIssues': selectedIssues,
-      'name': nameController.text,
-      'team': teamController.text,
-      'email': emailController.text,
-      'costumeNumbers': costumeNumberController.text,
-      'comments': commentController.text,
-      'photoPath': photo?.path ?? '',
-      // add 'thumbnailPath' here if you generate and want to save thumbnails
-    };
-
-    final repairsRef = _dbRef.child('admins').child(adminId!).child('repairs');
-
-    if (widget.repairKey != null && widget.repairKey!.isNotEmpty) {
-      // Update existing repair
-      await repairsRef.child(widget.repairKey!).set(repairData);
-    } else {
-      // Create new repair with a unique key from push()
-      final newRef = repairsRef.push();
-      await newRef.set(repairData);
+      setState(() => photo = File(file.path));
     }
   }
 
@@ -195,9 +131,9 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
     final imageSource = issue['image'];
     Widget imageWidget;
 
-    if (imageSource is String && imageSource.startsWith('http')) {
+    if (imageSource != null && imageSource.startsWith('http')) {
       imageWidget = Image.network(imageSource, width: 100, height: 100, fit: BoxFit.cover);
-    } else if (imageSource is String) {
+    } else if (imageSource != null && imageSource.isNotEmpty) {
       imageWidget = Image.file(File(imageSource), width: 100, height: 100, fit: BoxFit.cover);
     } else {
       imageWidget = const Icon(Icons.broken_image, size: 100);
@@ -212,10 +148,7 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Opacity(
-            opacity: selected ? 0.5 : 1.0,
-            child: imageWidget,
-          ),
+          Opacity(opacity: selected ? 0.5 : 1.0, child: imageWidget),
           if (selected)
             Container(
               width: 100,
@@ -237,6 +170,57 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
     );
   }
 
+  Future<void> saveRepairData() async {
+    final provider = context.read<RepairProvider>();
+
+    final issues = issueOptions
+        .where((i) => i['selected'] == true)
+        .map((i) => Issues(
+              id: i['id'] ?? uuid.v4(),
+              title: i['title'],
+              image: i['image'],
+            ))
+        .toList();
+
+    final repairId = existingRepair?.id ?? uuid.v4();
+
+    final repair = Repairs(
+      id: repairId,
+      danceId: widget.dance.id,
+      gender: widget.gender,
+      team: teamController.text,
+      costumeTitle: widget.costume.title,
+      costumeId: widget.costume.id,
+      name: nameController.text,
+      email: emailController.text,
+      number: costumeNumberController.text,
+      issues: issues,
+      comments: commentController.text,
+      completed: false,
+    );
+
+    // Add/update in provider (and Firebase)
+    if (existingRepair != null) {
+      await provider.update(repair);
+    } else {
+      await provider.add(repair);
+    }
+
+    // Navigate to summary page
+    if (context.mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RepairSummaryPage(
+            repair: repair,
+            role: widget.role,
+          ),
+        ),
+      );
+    }
+  }
+
+
   @override
   void dispose() {
     nameController.dispose();
@@ -249,9 +233,25 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final key = '${widget.dance.id}_${widget.costume.title}';
+    final issuesProvider = context.watch<IssuesProvider>();
+    final allIssues = issuesProvider.allIssues;
+
+      // Merge existing selected issues with provider issues
+    issueOptions = allIssues.map((issue) {
+      // Check if already selected in existing repair
+      final existing = issueOptions.firstWhere(
+        (opt) => opt['title'] == issue.title,
+        orElse: () => {'title': issue.title, 'image': issue.image, 'selected': false},
+      );
+      return {
+        'title': issue.title,
+        'image': issue.image,
+        'selected': existing['selected'] ?? false,
+      };
+    }).toList();
 
     return Scaffold(
+      backgroundColor: myColors.primary,
       appBar: AppBar(title: Text('${widget.dance.title} - ${widget.costume.title}')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -260,26 +260,20 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
           children: [
             const Text('Select Repair Issues:', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            issueOptions.isEmpty
+            allIssues.isEmpty
                 ? const Text("No issues found. Add some to the Issue Menu.")
                 : Wrap(
                     spacing: 10,
                     runSpacing: 10,
-                    children: List.generate(
-                      issueOptions.length,
-                      (index) => buildIssueCard(issueOptions[index], index),
-                    ),
+                    children: List.generate(issueOptions.length,
+                        (index) => buildIssueCard(issueOptions[index], index)),
                   ),
             const SizedBox(height: 20),
             TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name')),
             TextField(controller: teamController, decoration: const InputDecoration(labelText: 'Team')),
             TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email')),
             TextField(controller: costumeNumberController, decoration: const InputDecoration(labelText: 'Costume Number(s)')),
-            TextField(
-              controller: commentController,
-              maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Comments'),
-            ),
+            TextField(controller: commentController, maxLines: 3, decoration: const InputDecoration(labelText: 'Comments')),
             const SizedBox(height: 16),
             GestureDetector(
               onTap: pickImage,
@@ -298,21 +292,7 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
             const SizedBox(height: 20),
             Center(
               child: ElevatedButton(
-                onPressed: () async {
-                  await saveRepairData();
-                  if (context.mounted) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => RepairSummaryPage(
-                          repairKey: key,
-                          costumeTitle: widget.costume.title,
-                          role: widget.role,
-                        ),
-                      ),
-                    );
-                  }
-                },
+                onPressed: saveRepairData,
                 child: const Text('Submit Repair'),
               ),
             ),

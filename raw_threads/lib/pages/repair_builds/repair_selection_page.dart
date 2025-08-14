@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:raw_threads/account/app_state.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
 import 'package:raw_threads/providers/costume_provider.dart';
-import 'package:provider/provider.dart';
 import 'package:raw_threads/pages/repair_builds/repair_details_page.dart';
+import 'package:raw_threads/classes/style_classes/my_colors.dart';
 
 class RepairSelectionPage extends StatefulWidget {
   final String role;
@@ -19,21 +20,26 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
   Dances? selectedDance;
   String? selectedGender;
   CostumePiece? selectedCostume;
+  bool loadingCostumes = false;
 
   bool get isAdmin => widget.role == 'admin';
 
   Future<void> _loadCostumes() async {
+    if (selectedDance == null || selectedGender == null) return;
+
+    setState(() => loadingCostumes = true);
+
     final adminId = context.read<AppState>().adminId;
-    if (adminId != null && selectedDance != null && selectedGender != null) {
-      // Properly init costumesProvider with danceId and gender
+    if (adminId != null) {
       await context
           .read<CostumesProvider>()
           .init(danceId: selectedDance!.id, gender: selectedGender!);
-
-      setState(() {
-        selectedCostume = null; // reset costume selection on dance/gender change
-      });
     }
+
+    setState(() {
+      selectedCostume = null; // reset selection
+      loadingCostumes = false;
+    });
   }
 
   @override
@@ -45,25 +51,23 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
     final costumesList = costumesProvider.costumes;
 
     return Scaffold(
+      backgroundColor: myColors.secondary,
       appBar: AppBar(title: const Text('Select Dance and Costume')),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            // Dance selection
             DropdownButton<Dances>(
               isExpanded: true,
-              hint: const Text('Select Dance'),
+              hint: Text('Select Dance', style: TextStyle(color: myColors.secondary)),
               value: selectedDance,
-              onChanged: (Dances? newValue) async {
+              onChanged: (Dances? newDance) async {
                 setState(() {
-                  selectedDance = newValue;
+                  selectedDance = newDance;
                   selectedGender = null;
                   selectedCostume = null;
                 });
-                // Only load costumes if gender already selected
-                if (newValue != null && selectedGender != null) {
-                  await _loadCostumes();
-                }
               },
               items: dances.map((dance) {
                 return DropdownMenuItem(
@@ -73,20 +77,19 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
               }).toList(),
             ),
             const SizedBox(height: 16),
+
+            // Gender selection
             if (selectedDance != null)
               DropdownButton<String>(
                 isExpanded: true,
                 hint: const Text('Select Gender'),
                 value: selectedGender,
-                onChanged: (String? newValue) async {
+                onChanged: (String? newGender) async {
                   setState(() {
-                    selectedGender = newValue;
+                    selectedGender = newGender;
                     selectedCostume = null;
                   });
-                  // Load costumes only if dance is selected
-                  if (selectedDance != null && newValue != null) {
-                    await _loadCostumes();
-                  }
+                  await _loadCostumes();
                 },
                 items: const [
                   DropdownMenuItem(value: 'Men', child: Text('Men')),
@@ -94,26 +97,36 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
                 ],
               ),
             const SizedBox(height: 16),
+
+            // Costume selection
             if (selectedGender != null)
-              costumesList.isNotEmpty
-                  ? DropdownButton<CostumePiece>(
-                      isExpanded: true,
-                      hint: const Text('Select Costume Piece'),
-                      value: selectedCostume,
-                      onChanged: (CostumePiece? newValue) {
-                        setState(() {
-                          selectedCostume = newValue;
-                        });
-                      },
-                      items: costumesList.map((piece) {
-                        return DropdownMenuItem(
-                          value: piece,
-                          child: Text(piece.title),
-                        );
-                      }).toList(),
-                    )
-                  : const Text('No costume pieces available for this gender'),
+              loadingCostumes
+                  ? const Center(child: CircularProgressIndicator())
+                  : costumesList.isNotEmpty
+                      ? DropdownButton<CostumePiece>(
+                          isExpanded: true,
+                          hint: const Text('Select Costume Piece'),
+                          value: selectedCostume,
+                          onChanged: (CostumePiece? newCostume) {
+                              // final costume = costumesProvider.getCostumeById(newCostume!.id);
+                              // final costumeTitle = costume.title;
+                            setState(() {
+                              selectedCostume = newCostume;
+                            }  
+                            );
+                          },
+                          items: costumesList.map((piece) {
+                            return DropdownMenuItem(
+                              value: piece,
+                              child: Text(piece.title),
+                            );
+                          }).toList(),
+                        )
+                      : const Text('No costume pieces available for this gender'),
+
             const Spacer(),
+
+            // Next button
             ElevatedButton(
               onPressed: (selectedDance != null &&
                       selectedGender != null &&
@@ -125,7 +138,9 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
                           builder: (_) => RepairDetailsPage(
                             widget.role,
                             dance: selectedDance!,
+                            gender: selectedGender!,
                             costume: selectedCostume!,
+                            costumeTitle: selectedCostume!.title,
                           ),
                         ),
                       );
