@@ -194,7 +194,7 @@ class _DanceInventoryPageState extends State<DanceInventoryPage> {
         ),
         child: const Icon(Icons.add, size: 30),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }
