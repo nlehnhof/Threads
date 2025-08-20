@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:raw_threads/providers/issues_provider.dart';
 import 'package:raw_threads/account/app_state.dart';
 import 'package:provider/provider.dart';
+import 'package:raw_threads/classes/style_classes/my_colors.dart';
 
 class IssueMenuPage extends StatefulWidget {
   const IssueMenuPage({super.key});
@@ -79,7 +80,19 @@ class _IssueMenuPageState extends State<IssueMenuPage> {
     final isAdmin = context.watch<AppState>().role == 'admin';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Issue Menu')),
+      backgroundColor: myColors.secondary,
+      appBar: AppBar(
+        backgroundColor: myColors.secondary,
+        title: const Text(
+          'Issue Menu',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 24,
+            fontFamily: 'Vogun',
+            fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
       floatingActionButton: isAdmin
           ? FloatingActionButton(
               onPressed: _addIssue,
@@ -96,46 +109,48 @@ class _IssueMenuPageState extends State<IssueMenuPage> {
 
           return GridView.builder(
             padding: const EdgeInsets.all(12),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              childAspectRatio: 1,
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 180,
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
+              childAspectRatio: 0.75,
             ),
             itemCount: issues.length,
             itemBuilder: (_, index) {
               final issue = issues[index];
               return GestureDetector(
-                onLongPress:
-                    isAdmin ? () => _deleteIssue(issue.id) : null,
-                child: Card(
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  clipBehavior: Clip.antiAlias,
-                  elevation: 4,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
+                onLongPress: isAdmin ? () => _deleteIssue(issue.id) : null,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 1,
+                      child: Card(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        elevation: 4,
                         child: Image.file(
                           File(issue.image ?? ''),
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) =>
                               const Icon(Icons.broken_image),
+                          ),
                         ),
                       ),
-                      Container(
-                        alignment: Alignment.center,
-                        color: Colors.black45,
-                        child: Text(
-                          issue.title,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
+                      const SizedBox(height: 6),
+                      Text(
+                        issue.title,
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
                       ),
-                    ],
-                  ),
+                  ],               
                 ),
               );
             },

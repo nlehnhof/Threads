@@ -147,7 +147,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   )
                 ],
               );
-            }).toList(),
+            }),
             const SizedBox(height: 10),
             ElevatedButton(onPressed: _addSize, child: const Text('Add Size')),
             const SizedBox(height: 20),

@@ -20,57 +20,58 @@ class RepairProvider extends ChangeNotifier {
   RepairProvider({required this.adminId});
 
   Future<void> init() async {
+    // Cancel previous subscription
     await _repairSubscription?.cancel();
-    await _loadFromFirebase();
 
-    // Listen for live updates
-    _repairSubscription = FirebaseDatabase.instance
-        .ref('admins/$adminId/repairs')
-        .onValue
-        .listen((event) {
+    final ref = FirebaseDatabase.instance.ref('admins/$adminId/repairs');
+
+    // Inside onValue listener
+    _repairSubscription = ref.onValue.listen((event) {
       final repairsMap = event.snapshot.value as Map<dynamic, dynamic>?;
 
-      _repairs.clear();
-      _repairMap.clear();
-
-      if (repairsMap != null) {
-        repairsMap.forEach((key, value) {
-          final repair = Repairs.fromJson(Map<String, dynamic>.from(value));
-          _repairs.add(repair);
-          _repairMap[repair.id] = repair;
-        });
-      }
+      _parseRepairs(repairsMap);
       notifyListeners();
     });
-  }
 
-  Future<void> _loadFromFirebase() async {
-    final snapshot =
-        await FirebaseDatabase.instance.ref('admins/$adminId/repairs').get();
-
-    _repairs.clear();
-    _repairMap.clear();
-
-    if (snapshot.exists) {
-      final repairMap = Map<String, dynamic>.from(snapshot.value as Map);
-      repairMap.forEach((key, value) {
-        final repair = Repairs.fromJson(Map<String, dynamic>.from(value));
-        _repairs.add(repair);
-        _repairMap[repair.id] = repair;
-      });
-    }
+    // And after initial get()
+    final snapshot = await ref.get();
+    _parseRepairs(snapshot.value as Map<dynamic, dynamic>?);
     notifyListeners();
   }
 
+  void _parseRepairs(Map<dynamic, dynamic>? repairsMap) {
+    _repairs.clear();
+    _repairMap.clear();
+
+    if (repairsMap == null) return;
+
+    repairsMap.forEach((key, value) {
+      // Convert top-level map to Map<String, dynamic>
+      final Map<String, dynamic> repairJson = Map<String, dynamic>.from(value as Map<dynamic, dynamic>);
+
+      // Handle nested 'issues' list if present
+      if (repairJson['issues'] != null && repairJson['issues'] is List) {
+        repairJson['issues'] = (repairJson['issues'] as List)
+            .map((e) => e is Map
+                ? Map<String, dynamic>.from(e)
+                : e)
+            .toList();
+      }
+
+      final repair = Repairs.fromJson(repairJson);
+      _repairs.add(repair);
+      _repairMap[repair.id] = repair;
+    });
+  }
+
+
   Future<void> add(Repairs repair) async {
-    final ref =
-        FirebaseDatabase.instance.ref('admins/$adminId/repairs/${repair.id}');
+    final ref = FirebaseDatabase.instance.ref('admins/$adminId/repairs/${repair.id}');
     await ref.set(repair.toJson());
   }
 
   Future<void> update(Repairs updated) async {
-    final ref =
-        FirebaseDatabase.instance.ref('admins/$adminId/repairs/${updated.id}');
+    final ref = FirebaseDatabase.instance.ref('admins/$adminId/repairs/${updated.id}');
     await ref.set(updated.toJson());
 
     final index = _repairs.indexWhere((r) => r.id == updated.id);
@@ -92,7 +93,6 @@ class RepairProvider extends ChangeNotifier {
   Future<void> markRepairCompleted(String repairId) async {
     final repair = _repairMap[repairId];
     if (repair == null) return;
-
     repair.completed = true;
     await update(repair);
   }
@@ -100,7 +100,6 @@ class RepairProvider extends ChangeNotifier {
   Future<void> addIssueToRepair(String repairId, Issues newIssue) async {
     final repair = _repairMap[repairId];
     if (repair == null) return;
-
     repair.issues.add(newIssue);
     await update(repair);
   }

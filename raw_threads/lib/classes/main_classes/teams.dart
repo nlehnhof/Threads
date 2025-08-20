@@ -4,7 +4,7 @@ const uuid = Uuid();
 
 class Teams {
   final String id;
-  final String title;
+  String title;
   final List<String> members;
   final List<String> assigned;
 

@@ -10,6 +10,7 @@ import 'package:raw_threads/pages/assignment_builds/assign_page.dart';
 import 'package:raw_threads/providers/assignments_provider.dart';
 import 'package:raw_threads/providers/costume_provider.dart';
 import 'package:raw_threads/account/app_state.dart';
+import 'package:raw_threads/classes/style_classes/my_colors.dart';
 
 class CostumePage extends StatefulWidget {
   final String role;
@@ -201,8 +202,17 @@ class _CostumePageState extends State<CostumePage> {
     final costumes = provider.costumes;
 
     return Scaffold(
+      backgroundColor: myColors.secondary,
       appBar: AppBar(
-        title: Text('${widget.gender} - ${widget.dance.title}'),
+        backgroundColor: myColors.secondary,
+        title: Text('${widget.dance.title} ${widget.gender}\'s Items',
+        style: TextStyle(
+          color: Colors.black,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'Vogun',
+          fontSize: 24,
+        ),
+        ),
         centerTitle: true,
       ),
       body: Padding(

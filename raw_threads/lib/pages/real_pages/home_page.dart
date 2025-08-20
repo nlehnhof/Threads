@@ -223,12 +223,13 @@ class _HomePageState extends State<HomePage> {
     final showsProvider = context.watch<ShowsProvider>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFEBEFEE),
+      backgroundColor: myColors.secondary,
       appBar: AppBar(
-        backgroundColor: myColors.primary,
+        automaticallyImplyLeading: false,
+        backgroundColor: myColors.secondary,
         title: Row(
           children: [
-            Image.asset('assets/logotype_white.png', height: 30),
+            Image.asset('assets/logotype_green.png', height: 20),
           ],
         ),
         centerTitle: false,
@@ -254,12 +255,13 @@ class _HomePageState extends State<HomePage> {
                 "Home",
                 style: TextStyle(
                   color: Colors.black,
-                  fontSize: 34,
+                  fontSize: 28,
                   fontFamily: 'Vogun',
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
+            const SizedBox(height: 20),
             Expanded(
               child: ShowsList(
                 onRemoveShow: isAdmin ? _removeShow : null,
@@ -276,7 +278,7 @@ class _HomePageState extends State<HomePage> {
                 color: const Color(0xFF6A8071),
                 color2: Colors.white,
               ),
-            const SizedBox(height: 50),
+            const SizedBox(height: 30),
           ],
         ),
       ),

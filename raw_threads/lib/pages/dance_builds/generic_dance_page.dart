@@ -6,7 +6,6 @@ import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/pages/costume_builds/costume_page.dart';
 import 'package:raw_threads/pages/dance_builds/add_generic_dialog.dart';
-// import 'package:raw_threads/providers/app_context_provider.dart';
 import 'package:raw_threads/account/app_state.dart';
 
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
@@ -115,14 +114,14 @@ class _GenericDancePageState extends State<GenericDancePage> {
                 ElevatedButton(
                   onPressed: () async {
                     for (final team in teamProvider.teams) {
-                      await teamProvider.unassignDanceFromTeam(dance.id, team.id);
+                      await teamProvider.unassignDanceFromTeam(team.id, dance.id);
                     }
                     for (final teamId in selectedTeamIds) {
-                      await teamProvider.assignDanceToTeam(dance.id, teamId);
+                      await teamProvider.assignDanceToTeam(teamId, dance.id);
                     }
                     Navigator.pop(context);
                   },
-                  child: const Text('Assign'),
+                  child: const Text('Assign to Team'),
                 ),
               ],
             );
@@ -148,8 +147,9 @@ class _GenericDancePageState extends State<GenericDancePage> {
           dance.title,
           style: const TextStyle(
             color: Colors.black,
-            fontSize: 17,
-            fontFamily: 'Raleway',
+            fontWeight: FontWeight.bold,
+            fontSize: 32,
+            fontFamily: 'Vogun',
           ),
         ),
         actions: [
@@ -198,7 +198,7 @@ class _GenericDancePageState extends State<GenericDancePage> {
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -210,13 +210,12 @@ class _GenericDancePageState extends State<GenericDancePage> {
                 _buildImageCard(dance.rightImagePath),
               ],
             ),
-            const SizedBox(height: 16),
-            _buildInfoText(dance.title, fontSize: 22, isBold: true),
-            const SizedBox(height: 4),
-            _buildInfoText(dance.country),
+            const SizedBox(height: 14),
+            _buildInfoText(dance.title, fontSize: 28, isBold: true),
+            _buildInfoText(dance.country, fontSize: 16),
             const SizedBox(height: 24),
             _buildButton(context, 'Men'),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             _buildButton(context, 'Women'),
             const Spacer(),
             if (isAdmin)
@@ -262,14 +261,14 @@ class _GenericDancePageState extends State<GenericDancePage> {
     );
   }
 
-  Widget _buildInfoText(String text, {double fontSize = 15, bool isBold = false}) {
+  Widget _buildInfoText(String text, {double fontSize = 15, bool isBold = false, String fontFamily = 'Raleway'}) {
     return Container(
       width: 337,
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Text(
         text,
         style: TextStyle(
-          fontFamily: 'Raleway',
+          fontFamily: fontFamily,
           fontSize: fontSize,
           fontWeight: isBold ? FontWeight.w700 : FontWeight.normal,
           color: const Color(0xFF191B1A),

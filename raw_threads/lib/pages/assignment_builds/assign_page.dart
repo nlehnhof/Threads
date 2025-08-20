@@ -113,7 +113,17 @@ class _AssignPageState extends State<AssignPage> {
 
     if (danceId.isEmpty || gender.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Assignments")),
+        backgroundColor: myColors.secondary,
+        appBar: AppBar(
+          title: Text(
+            "Assignments",
+          style: TextStyle(
+            fontFamily: 'Vogun',
+            color: Colors.black87,
+            fontSize: 22,
+            ),
+          ),
+        ),
         body: const Center(
           child: Text("Could not find dance/gender for this costume."),
         ),
@@ -135,7 +145,15 @@ class _AssignPageState extends State<AssignPage> {
     return Scaffold(
       backgroundColor: myColors.secondary,
       appBar: AppBar(
-        title: Text('${widget.costume.title} Assignments'),
+        backgroundColor: myColors.secondary,
+        title: Text(
+          '${widget.costume.title} Assignments',
+          style: TextStyle(
+            fontFamily: 'Vogun',
+            color: Colors.black87,
+            fontSize: 22,
+          ),
+        ),
         centerTitle: true,
         actions: [
           if (isAdmin)
@@ -148,10 +166,28 @@ class _AssignPageState extends State<AssignPage> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              decoration: const InputDecoration(hintText: "Search"),
-              onChanged: (value) => setState(() => searchQuery = value),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Column(
+              children: [
+                Material(
+                  elevation: 3,
+                  borderRadius: BorderRadius.circular(16),
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: "Search",
+                      prefixIcon: const Icon(Icons.search),
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                      ),
+                    onChanged: (value) => setState(() => searchQuery = value),
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
@@ -159,12 +195,37 @@ class _AssignPageState extends State<AssignPage> {
               itemCount: filtered.length,
               itemBuilder: (context, index) {
                 final assignment = filtered[index];
-                return ListTile(
-                  title: Text('${assignment.number} ${widget.costume.title}'),
-                  subtitle: Text('${assignment.size} | ${assignment.user}'),
-                  onTap: isAdmin
-                      ? () => _addOrEditAssignment(existing: assignment, index: index)
-                      : null,
+                return Column(
+                  children: [
+                    InkWell(
+                      onTap: isAdmin
+                        ? () => _addOrEditAssignment(existing: assignment, index: index)
+                        : null,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${assignment.number} ${assignment.size}',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          Text(
+                            assignment.user,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ),
+                  ],
                 );
               },
             ),

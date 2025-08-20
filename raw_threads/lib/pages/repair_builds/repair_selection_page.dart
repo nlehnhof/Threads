@@ -52,75 +52,99 @@ class _RepairSelectionPageState extends State<RepairSelectionPage> {
 
     return Scaffold(
       backgroundColor: myColors.secondary,
-      appBar: AppBar(title: const Text('Select Dance and Costume')),
+      appBar: AppBar(title: const Text('Select Dance and Costume'), backgroundColor: myColors.secondary,),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Dance selection
-            DropdownButton<Dances>(
-              isExpanded: true,
-              hint: Text('Select Dance', style: TextStyle(color: myColors.secondary)),
-              value: selectedDance,
-              onChanged: (Dances? newDance) async {
-                setState(() {
-                  selectedDance = newDance;
-                  selectedGender = null;
-                  selectedCostume = null;
-                });
-              },
-              items: dances.map((dance) {
-                return DropdownMenuItem(
-                  value: dance,
-                  child: Text(dance.title),
-                );
-              }).toList(),
+            // Dance selection (in card)
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: DropdownButton<Dances>(
+                  isExpanded: true,
+                  underline: const SizedBox(),
+                  hint: const Text("Select Dance"),
+                  value: selectedDance,
+                  onChanged: (Dances? newDance) {
+                    setState(() {
+                      selectedDance = newDance;
+                      selectedGender = null;
+                      selectedCostume = null;
+                    });
+                  },
+                  items: dances.map((dance) {
+                    return DropdownMenuItem(
+                      value: dance,
+                      child: Text(dance.title),
+                    );
+                  }).toList(),
+                ),
+              ),
             ),
             const SizedBox(height: 16),
 
-            // Gender selection
+            // Gender selection (in card)
             if (selectedDance != null)
-              DropdownButton<String>(
-                isExpanded: true,
-                hint: const Text('Select Gender'),
-                value: selectedGender,
-                onChanged: (String? newGender) async {
-                  setState(() {
-                    selectedGender = newGender;
-                    selectedCostume = null;
-                  });
-                  await _loadCostumes();
-                },
-                items: const [
-                  DropdownMenuItem(value: 'Men', child: Text('Men')),
-                  DropdownMenuItem(value: 'Women', child: Text('Women')),
-                ],
+              Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    underline: const SizedBox(),
+                    hint: const Text('Select Gender'),
+                    value: selectedGender,
+                    onChanged: (String? newGender) async {
+                      setState(() {
+                        selectedGender = newGender;
+                        selectedCostume = null;
+                      });
+                      await _loadCostumes();
+                    },
+                    items: const [
+                      DropdownMenuItem(value: 'Men', child: Text('Men')),
+                      DropdownMenuItem(value: 'Women', child: Text('Women')),
+                    ],
+                  ),
+                ),
               ),
             const SizedBox(height: 16),
 
-            // Costume selection
+            // Costume selection (in card)
             if (selectedGender != null)
               loadingCostumes
                   ? const Center(child: CircularProgressIndicator())
                   : costumesList.isNotEmpty
-                      ? DropdownButton<CostumePiece>(
-                          isExpanded: true,
-                          hint: const Text('Select Costume Piece'),
-                          value: selectedCostume,
-                          onChanged: (CostumePiece? newCostume) {
-                              // final costume = costumesProvider.getCostumeById(newCostume!.id);
-                              // final costumeTitle = costume.title;
-                            setState(() {
-                              selectedCostume = newCostume;
-                            }  
-                            );
-                          },
-                          items: costumesList.map((piece) {
-                            return DropdownMenuItem(
-                              value: piece,
-                              child: Text(piece.title),
-                            );
-                          }).toList(),
+                      ? Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: DropdownButton<CostumePiece>(
+                              isExpanded: true,
+                              underline: const SizedBox(),
+                              hint: const Text('Select Costume Piece'),
+                              value: selectedCostume,
+                              onChanged: (CostumePiece? newCostume) {
+                                setState(() {
+                                  selectedCostume = newCostume;
+                                });
+                              },
+                              items: costumesList.map((piece) {
+                                return DropdownMenuItem(
+                                  value: piece,
+                                  child: Text(piece.title),
+                                );
+                              }).toList(),
+                            ),
+                          ),
                         )
                       : const Text('No costume pieces available for this gender'),
 

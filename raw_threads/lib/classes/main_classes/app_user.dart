@@ -6,6 +6,7 @@ class AppUser {
   final String? phoneNumber;
   final String? photoURL;
   final Map<String, String> sizes; // key = size type, value = measurement
+  final String? assignedTeamId;
 
   AppUser({
     required this.id,
@@ -14,6 +15,7 @@ class AppUser {
     required this.role,
     this.phoneNumber,
     this.photoURL,
+    this.assignedTeamId,
     this.sizes = const {},
   });
 
@@ -26,6 +28,7 @@ class AppUser {
       role: json['role'] ?? 'user',
       phoneNumber: json['phoneNumber'],
       photoURL: json['photoURL'],
+      assignedTeamId: json['assignedTeamId'],
       sizes: sizesMap,
     );
   }
@@ -38,6 +41,7 @@ class AppUser {
       'role': role,
       'phoneNumber': phoneNumber,
       'photoURL': photoURL,
+      'assignedTeamId': assignedTeamId,
       'sizes': sizes,
     };
   }
@@ -47,6 +51,7 @@ class AppUser {
     String? email,
     String? username,
     String? role,
+    String? assignedTeamId,
     String? phoneNumber,
     String? photoURL,
     Map<String, String>? sizes,
@@ -57,6 +62,7 @@ class AppUser {
       username: username ?? this.username,
       role: role ?? this.role,
       phoneNumber: phoneNumber ?? this.phoneNumber,
+      assignedTeamId: assignedTeamId ?? this.assignedTeamId,
       photoURL: photoURL ?? this.photoURL,
       sizes: sizes ?? this.sizes,
     );

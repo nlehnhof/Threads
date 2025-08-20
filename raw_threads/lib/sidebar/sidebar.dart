@@ -46,7 +46,7 @@ class Sidebar extends StatelessWidget {
                   destinationBuilder: () => RepairPage(role: role),
                   image: 'assets/repairs.png'),
               SidebarItem(
-                  destinationBuilder: () => TeamsPage(),
+                  destinationBuilder: () => TeamsPage(role: role),
                   image: 'assets/teams.png'),
             ].expand((item) => [
                   item,

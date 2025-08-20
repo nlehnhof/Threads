@@ -14,6 +14,7 @@ import 'package:raw_threads/providers/repair_provider.dart';
 import 'firebase_options.dart';
 import 'package:raw_threads/pages/real_pages/welcome_page.dart';
 import 'package:raw_threads/pages/real_pages/home_page.dart';
+import 'package:raw_threads/pages/real_pages/route_observer.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -67,6 +68,7 @@ class MyApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
+        navigatorObservers: [routeObserver],
         debugShowCheckedModeBanner: false,
         title: 'Raw Threads',
         theme: ThemeData(

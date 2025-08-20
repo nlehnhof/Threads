@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:raw_threads/classes/main_classes/teams.dart';
 import 'package:raw_threads/providers/teams_provider.dart';
-import 'package:collection/collection.dart';
-import 'package:raw_threads/providers/dance_inventory_provider.dart';
+import 'package:raw_threads/account/app_state.dart';
+import 'package:raw_threads/classes/style_classes/my_colors.dart';
+import 'package:raw_threads/sidebar/sidebar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:raw_threads/account/app_state.dart';
-
+import 'package:raw_threads/providers/dance_inventory_provider.dart';
 class TeamsPage extends StatefulWidget {
-  const TeamsPage({super.key});
+  final String role;
+  const TeamsPage({super.key, required this.role});
 
   @override
   State<TeamsPage> createState() => _TeamsPageState();
@@ -21,8 +22,8 @@ class _TeamsPageState extends State<TeamsPage> {
   @override
   void initState() {
     super.initState();
-    // Load initial team data on page load
-    context.read<TeamProvider>().loadTeamData();
+    final provider = context.read<TeamProvider>();
+    provider.init();
   }
 
   @override
@@ -33,168 +34,58 @@ class _TeamsPageState extends State<TeamsPage> {
 
   Future<void> _linkAdminCode(BuildContext context, TeamProvider provider) async {
     final code = _adminCodeController.text.trim();
-    print("[DEBUG] _linkAdminCode called with code: '$code'");
-
-    final appState = context.read<AppState>();
-    final currentAdminId = appState.adminId;
     final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) {
-      print("[DEBUG] No authenticated user found. Aborting.");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User not authenticated')),
-      );
-      return;
-    }
-
-    if (currentAdminId == null) {
-      print("[DEBUG] No current adminId in AppState. Aborting.");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No admin ID found in app state')),
-      );
-      return;
-    }
+    if (user == null) return;
 
     final dbRef = FirebaseDatabase.instance.ref();
+    final adminSnapshot = await dbRef.child('admins').orderByChild('admincode').equalTo(code).get();
 
-    try {
-      print("[DEBUG] Querying admins where admincode == '$code'");
-      final adminSnapshot = await dbRef
-          .child('admins')
-          .orderByChild('admincode')
-          .equalTo(code)
-          .get();
-
-      if (adminSnapshot.exists) {
-        final adminsMap = adminSnapshot.value as Map<dynamic, dynamic>;
-        final adminUid = adminsMap.keys.first as String;
-
-        print("[DEBUG] Found admin UID: $adminUid");
-
-        // Update the user's linkedAdminId in the DB
-        await dbRef.child('users/${user.uid}').update({'linkedAdminId': adminUid});
-        print("[DEBUG] User's linkedAdminId updated.");
-
-        // Update the global appState adminId to this linked adminUid
-        appState.setAdminId(adminUid);
-
-        // Reload teams and dances for the new admin
-        await provider.loadTeamData();
-        await context.read<DanceInventoryProvider>().init();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Successfully linked to admin $code')),
-        );
-        _adminCodeController.clear();
-      } else {
-        print("[DEBUG] No admin found with code '$code'");
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Admin Code Error')),
-        );
-      }
-    } catch (e, stack) {
-      print("[ERROR] Exception while querying admins: $e");
-      print(stack);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to link admin code')),
-      );
+    if (adminSnapshot.exists) {
+      final adminUid = (adminSnapshot.value as Map).keys.first as String;
+      await dbRef.child('users/${user.uid}').update({'linkedAdminId': adminUid});
+      context.read<AppState>().setAdminId(adminUid);
+      await context.read<TeamProvider>().init();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Linked to admin $code')));
+      _adminCodeController.clear();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid admin code')));
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<TeamProvider>();
+    return Consumer<TeamProvider>(builder: (context, provider, _) {
+      if (provider.isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
-    if (provider.isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (provider.role == 'admin') {
-      return _adminView(provider);
-    } else {
-      return _userView(provider);
-    }
-  }
-
-  void _showEditTeamDialog(BuildContext context, TeamProvider provider, Teams team) {
-    final controller = TextEditingController(text: team.title);
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Edit Team Name'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'Team Name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final newName = controller.text.trim();
-              if (newName.isNotEmpty && newName != team.title) {
-                provider.renameTeam(team.id, newName);
-              }
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _confirmDeleteTeam(BuildContext context, TeamProvider provider, Teams team) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete Team'),
-        content: Text('Are you sure you want to delete the team "${team.title}"? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              provider.deleteTeam(team.id);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+      return widget.role == 'admin' ? _adminView(provider) : _userView(provider);
+    });
   }
 
   Widget _adminView(TeamProvider provider) {
+    final danceProvider = Provider.of<DanceInventoryProvider>(context);
+    
     return Scaffold(
-      appBar: AppBar(title: const Text('Teams')),
+      backgroundColor: myColors.secondary,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: myColors.secondary,
+        title: Image.asset('assets/logotype_green.png', height: 20),
+        actions: [Builder(builder: (context) => IconButton(icon: const Icon(Icons.menu), onPressed: () => Scaffold.of(context).openEndDrawer()))],
+      ),
+      endDrawer: Sidebar(role: widget.role),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Your Admin Code: ${provider.adminCode}',
-                style: const TextStyle(fontSize: 18)),
+            const Text('Teams', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            Text('Your Admin Code: ${provider.adminCode}', style: const TextStyle(fontSize: 18)),
             const SizedBox(height: 8),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.add),
-              label: const Text('Add Team'),
-              onPressed: () => _showAddTeamDialog(context, provider),
-            ),
+            ElevatedButton.icon(icon: const Icon(Icons.add), label: const Text('Add Team'), onPressed: () => _showAddTeamDialog(context, provider)),
             const Divider(),
             if (provider.unassignedUsers.isNotEmpty) ...[
-              const Text('Unassigned Users:',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Unassigned Users:', style: TextStyle(fontWeight: FontWeight.bold)),
               Wrap(
                 spacing: 8,
                 runSpacing: 4,
@@ -222,88 +113,33 @@ class _TeamsPageState extends State<TeamsPage> {
                           Row(
                             children: [
                               Expanded(
-                                child: Text(team.title,
-                                    style: const TextStyle(
-                                        fontSize: 18, fontWeight: FontWeight.bold)),
+                                child: Text(team.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                               ),
-                              IconButton(
-                                tooltip: 'Edit Team',
-                                icon: const Icon(Icons.edit),
-                                onPressed: () => _showEditTeamDialog(context, provider, team),
-                              ),
-                              IconButton(
-                                tooltip: 'Delete Team',
-                                icon: const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () => _confirmDeleteTeam(context, provider, team),
-                              ),
+                              IconButton(icon: const Icon(Icons.edit), onPressed: () => _showEditTeamDialog(context, provider, team)),
+                              IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _confirmDeleteTeam(context, provider, team)),
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
+                          const Text('Members:', style: TextStyle(fontWeight: FontWeight.bold)),
+                          team.members.isEmpty
+                              ? const Text('No members assigned')
+                              : Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Members:',
-                                        style: TextStyle(fontWeight: FontWeight.bold)),
-                                    ...team.members.map((uid) {
-                                      final username = provider.usernameFor(uid);
-                                      return Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Expanded(child: Text(username)),
-                                          IconButton(
-                                            icon: const Icon(Icons.remove_circle, color: Colors.red),
-                                            tooltip: 'Remove User from Team',
-                                            onPressed: () {
-                                              provider.removeUserFromTeam(uid, team.id);
-                                            },
-                                          ),
-                                          PopupMenuButton<String>(
-                                            tooltip: 'Move User to Another Team',
-                                            icon: const Icon(Icons.swap_horiz),
-                                            onSelected: (newTeamId) {
-                                              provider.assignUserToTeam(uid, newTeamId);
-                                            },
-                                            itemBuilder: (context) {
-                                              return provider.teams
-                                                  .where((t) => t.id != team.id)
-                                                  .map((t) => PopupMenuItem(
-                                                        value: t.id,
-                                                        child: Text(t.title),
-                                                      ))
-                                                  .toList();
-                                            },
-                                          ),
-                                        ],
-                                      );
-                                    }),
-                                  ],
+                                  children: team.members.map((uid) => Text(provider.usernameFor(uid))).toList(),
                                 ),
-                              ),
-                              Expanded(
-                                child: Consumer<DanceInventoryProvider>(
-                                  builder: (context, danceProvider, child) {
-                                    return Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text('Assigned Dances:',
-                                            style: TextStyle(fontWeight: FontWeight.bold)),
-                                        if (team.assigned.isEmpty)
-                                          const Text('No dances assigned'),
-                                        ...team.assigned.map((danceId) {
-                                          final dance = danceProvider.getDanceById(danceId);
-                                          final danceName = dance?.title ?? 'Unknown Dance';
-                                          return Text(danceName);
-                                        }),
-                                      ],
+                          const SizedBox(height: 8),
+                          const Text('Assigned Dances:', style: TextStyle(fontWeight: FontWeight.bold)),
+                          team.assigned.isEmpty
+                              ? const Text('No dances assigned')
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: team.assigned.map((danceId) {
+                                    final dance = danceProvider.dances.firstWhere(
+                                      (d) => d.id == danceId
                                     );
-                                  },
+                                    return Text(dance.title);
+                                  }).toList(),
                                 ),
-                              ),
-                            ],
-                          )
                         ],
                       ),
                     ),
@@ -317,59 +153,47 @@ class _TeamsPageState extends State<TeamsPage> {
     );
   }
 
+
   Widget _userView(TeamProvider provider) {
-    final team = provider.teams
-        .firstWhereOrNull((t) => t.id == provider.assignedTeamId);
+    final team = provider.teams.firstWhere((t) => t.id == provider.assignedTeamId, orElse: () => Teams(id: '', title: 'No team assigned', members: [], assigned: []));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My Team')),
+      backgroundColor: myColors.secondary,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: myColors.secondary,
+        title: Image.asset('assets/logotype_green.png', height: 20),
+        actions: [Builder(builder: (context) => IconButton(icon: const Icon(Icons.menu), onPressed: () => Scaffold.of(context).openEndDrawer()))],
+      ),
+      endDrawer: Sidebar(role: widget.role),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (team == null)
-                const Center(child: Text('You are not assigned to any team yet.'))
-              else
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Team: ${team.title}',
-                        style: const TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 16),
-                    const Text('Members:',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                    ...team.members.map((uid) => Text(provider.usernameFor(uid))),
-                    const SizedBox(height: 16),
-                    const Text('Assigned Dances:',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                    ...team.assigned.map((danceId) => Text(danceId)),
-                    const SizedBox(height: 32),
-                  ],
-                ),
-
+              const Text('Team', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              team.id.isEmpty
+                  ? const Text('You are not assigned to any team yet.')
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Team: ${team.title}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 16),
+                        const Text('Members:', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ...team.members.map((uid) => Text(provider.usernameFor(uid))),
+                      ],
+                    ),
               const Divider(),
-              const Text('Link to Another Admin',
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87)),
+              const Text('Link to Another Admin', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               TextField(
                 controller: _adminCodeController,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Admin Code',
-                  hintText: 'Enter admin code to link',
-                ),
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Admin Code', hintText: 'Enter admin code to link'),
               ),
               const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () => _linkAdminCode(context, provider),
-                child: const Text('Link Admin'),
-              ),
+              ElevatedButton(onPressed: () => _linkAdminCode(context, provider), child: const Text('Link Admin')),
             ],
           ),
         ),
@@ -383,20 +207,12 @@ class _TeamsPageState extends State<TeamsPage> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Add Team'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'Team Name'),
-        ),
+        content: TextField(controller: controller, decoration: const InputDecoration(hintText: 'Team Name')),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                provider.addTeam(controller.text.trim());
-              }
+              if (controller.text.trim().isNotEmpty) provider.addTeam(controller.text.trim());
               Navigator.pop(context);
             },
             child: const Text('Add'),
@@ -406,8 +222,7 @@ class _TeamsPageState extends State<TeamsPage> {
     );
   }
 
-  void _showAssignUserDialog(
-      BuildContext context, TeamProvider provider, String userId) {
+  void _showAssignUserDialog(BuildContext context, TeamProvider provider, String userId) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -424,6 +239,49 @@ class _TeamsPageState extends State<TeamsPage> {
             );
           }).toList(),
         ),
+      ),
+    );
+  }
+
+  void _showEditTeamDialog(BuildContext context, TeamProvider provider, Teams team) {
+    final controller = TextEditingController(text: team.title);
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Edit Team Name'),
+        content: TextField(controller: controller, decoration: const InputDecoration(hintText: 'Team Name')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              final newName = controller.text.trim();
+              if (newName.isNotEmpty && newName != team.title) provider.renameTeam(team.id, newName);
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteTeam(BuildContext context, TeamProvider provider, Teams team) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Team'),
+        content: Text('Are you sure you want to delete the team "${team.title}"? This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              provider.deleteTeam(team.id);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }

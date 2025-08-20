@@ -60,7 +60,7 @@ class _ShowItemState extends State<ShowItem> {
       elevation: 2,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: const Color(0xFFF9F9F9),
+      color: const Color(0xFFFEFEFE),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -95,12 +95,12 @@ class _ShowItemState extends State<ShowItem> {
                     },
                     child: const Text(
                       'Edit',
-                      style: TextStyle(color: Colors.grey),
+                      style: TextStyle(color: Color(0xFF191B1A), fontSize: 15, fontFamily: 'Raleway', height: 0, fontWeight: FontWeight.bold),
                     ),
                   ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             _infoRow('Location', show.location),
             _infoRow('Dates', show.dates),
             _infoRow('Tech', show.tech),
@@ -114,7 +114,7 @@ class _ShowItemState extends State<ShowItem> {
                   const Text('Dances:',
                       style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                          fontSize: 18,
                           fontFamily: 'Vogun')),
                   if (show.danceIds.isEmpty)
                     const Text('No dances assigned.',
@@ -177,13 +177,13 @@ class _ShowItemState extends State<ShowItem> {
             Align(
               alignment: Alignment.center,
               child: FractionallySizedBox(
-                widthFactor: 0.7,
+                widthFactor: 0.85,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFBFCFC6),
-                    foregroundColor: Colors.black,
+                    backgroundColor: const Color(0xFFBFCCC2),
+                    foregroundColor: Colors.white,
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),

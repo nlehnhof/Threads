@@ -73,21 +73,28 @@ class _RepairSummaryPageState extends State<RepairSummaryPage> {
   Widget build(BuildContext context) {
     final costume = context.read<CostumesProvider>().getCostumeById(widget.repair.costumeId);
     final title = costume.title;
-    
+
     return Scaffold(
-      backgroundColor: myColors.primary,
+      backgroundColor: myColors.secondary,
       appBar: AppBar(
-        title: Text('${widget.repair.name} - $title Repair'),
+        backgroundColor: myColors.secondary,
+        elevation: 0,
+        title: Text(
+          '${widget.repair.name} - $title Repair',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Vogun', fontSize: 24),
+        ),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => RepairPage(role: widget.role)),
-                );
+                MaterialPageRoute(builder: (_) => RepairPage(role: widget.role)),
+              );
             },
-            child: const Text('Done', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Done',
+              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -96,36 +103,128 @@ class _RepairSummaryPageState extends State<RepairSummaryPage> {
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Name: ${widget.repair.name}'),
-                  Text('Team: ${widget.repair.team}'),
-                  Text('Email: ${widget.repair.email}'),
-                  Text('Costume #: ${widget.repair.number}'),
-                  Text('Comments: ${widget.repair.comments}'),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    children: (widget.repair.issues)
-                        .map((e) => Chip(label: Text(e.title)))
-                        .toList(),
+                  // Info card
+                  Card(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 3,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Repair Details",
+                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                          const Divider(),
+                          _buildDetailRow("Name", widget.repair.name),
+                          const SizedBox(height: 4),
+                          _buildDetailRow("Team", widget.repair.team),
+                          const SizedBox(height: 4),
+                          _buildDetailRow("Email", widget.repair.email),
+                          const SizedBox(height: 4),
+                          _buildDetailRow("Costume #", widget.repair.number),
+                          const SizedBox(height: 4),
+                          _buildDetailRow("Comments", widget.repair.comments),
+                        ],
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
-                  if (_thumbnailFile != null)
-                    Image.file(_thumbnailFile!, height: 200)
-                  else if (widget.repair.photoPath != null && widget.repair.photoPath!.isNotEmpty)
-                    Image.file(File(widget.repair.photoPath!), height: 200),
+
+                  // Issues summary card
+                  if (widget.repair.issues.isNotEmpty)
+                    Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 3,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Selected Issues",
+                                style: Theme.of(context).textTheme.titleMedium),
+                            const SizedBox(height: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: widget.repair.issues.map((e) {
+                                return ListTile(
+                                  leading: const Icon(Icons.check,
+                                      color: Colors.grey),
+                                  title: Text(e.title),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 16),
+
+                  // Photo card
+                  if (_thumbnailFile != null ||
+                      (widget.repair.photoPath != null &&
+                          widget.repair.photoPath!.isNotEmpty))
+                    Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 3,
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        children: [
+                          if (_thumbnailFile != null)
+                            Image.file(_thumbnailFile!, height: 220, fit: BoxFit.cover)
+                          else
+                            Image.file(File(widget.repair.photoPath!),
+                                height: 220, fit: BoxFit.cover),
+                        ],
+                      ),
+                    ),
+
                   const SizedBox(height: 24),
+
+                  // Admin complete button
                   if (isAdmin && !widget.repair.completed)
                     Center(
                       child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: myColors.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 14),
+                        ),
                         onPressed: _markRepairComplete,
-                        child: const Text('Mark Repair Complete'),
+                        child: const Text(
+                          'Mark Repair Complete',
+                          style: TextStyle(fontSize: 16, color: Colors.white),
+                        ),
                       ),
                     ),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String? value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("$label: ",
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          Expanded(child: Text(value?.isNotEmpty == true ? value! : "Not Given", style: TextStyle(fontSize: 18))),
+        ],
+      ),
     );
   }
 }

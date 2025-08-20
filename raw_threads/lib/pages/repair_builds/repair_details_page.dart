@@ -220,6 +220,32 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
     }
   }
 
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    int maxLines = 1,
+  }) {
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: TextField(
+          controller: controller,
+          maxLines: maxLines,
+          decoration: InputDecoration(
+            labelText: label,
+            border: InputBorder.none, // removes underline
+          ),
+        ),
+      ),
+    );
+  }
+
+
 
   @override
   void dispose() {
@@ -236,12 +262,15 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
     final issuesProvider = context.watch<IssuesProvider>();
     final allIssues = issuesProvider.allIssues;
 
-      // Merge existing selected issues with provider issues
+    // Merge existing selected issues with provider issues
     issueOptions = allIssues.map((issue) {
-      // Check if already selected in existing repair
       final existing = issueOptions.firstWhere(
         (opt) => opt['title'] == issue.title,
-        orElse: () => {'title': issue.title, 'image': issue.image, 'selected': false},
+        orElse: () => {
+          'title': issue.title,
+          'image': issue.image,
+          'selected': false
+        },
       );
       return {
         'title': issue.title,
@@ -251,39 +280,126 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: myColors.primary,
-      appBar: AppBar(title: Text('${widget.dance.title} - ${widget.costume.title}')),
+      backgroundColor: myColors.secondary,
+      appBar: AppBar(
+        backgroundColor: myColors.secondary,
+        elevation: 0,
+        title: Text(
+          '${widget.dance.title} - ${widget.costume.title}',
+          style: const TextStyle(color: Colors.black, fontFamily: 'Vogun', fontSize: 32, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.black),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Select Repair Issues:', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
+            const Text(
+              'What needs fixing?',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+                fontFamily: 'Vogun',
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Issues grid
             allIssues.isEmpty
                 ? const Text("No issues found. Add some to the Issue Menu.")
-                : Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: List.generate(issueOptions.length,
-                        (index) => buildIssueCard(issueOptions[index], index)),
+                : GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: issueOptions.length,
+                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 150, // square cards
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.8, // room for title
+                    ),
+                    itemBuilder: (_, index) {
+                      final issue = issueOptions[index];
+                      final selected = issue['selected'] == true;
+
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            issueOptions[index]['selected'] = !selected;
+                          });
+                        },
+                        child: Column(
+                          children: [
+                            AspectRatio(
+                              aspectRatio: 1, // square image
+                              child: Card(
+                                elevation: selected ? 6 : 2,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    issue['image'] != null &&
+                                            issue['image'].toString().isNotEmpty
+                                        ? Image.file(
+                                            File(issue['image']),
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                const Icon(Icons.broken_image),
+                                          )
+                                        : const Icon(Icons.broken_image),
+                                    if (selected)
+                                      Container(
+                                        color: Colors.black45,
+                                        child: const Icon(Icons.check,
+                                            color: Colors.white, size: 40),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              issue['title'],
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
-            const SizedBox(height: 20),
-            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name')),
-            TextField(controller: teamController, decoration: const InputDecoration(labelText: 'Team')),
-            TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email')),
-            TextField(controller: costumeNumberController, decoration: const InputDecoration(labelText: 'Costume Number(s)')),
-            TextField(controller: commentController, maxLines: 3, decoration: const InputDecoration(labelText: 'Comments')),
+
+            const SizedBox(height: 24),
+            // Form fields
+            _buildTextField(controller: nameController, label: 'Name'),
+            _buildTextField(controller: teamController, label: 'Team'),
+            _buildTextField(controller: emailController, label: 'Email'),
+            _buildTextField(controller: costumeNumberController, label: 'Costume Number(s)'),
+            _buildTextField(controller: commentController, label: 'Comments'),
             const SizedBox(height: 16),
             GestureDetector(
               onTap: pickImage,
               child: Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: SizedBox(
                   height: 200,
                   width: double.infinity,
                   child: Center(
                     child: photo != null
-                        ? Image.file(photo!, fit: BoxFit.cover, width: double.infinity)
+                        ? Image.file(photo!,
+                            fit: BoxFit.cover, width: double.infinity)
                         : const Text('Tap to take a picture'),
                   ),
                 ),
@@ -292,8 +408,34 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
             const SizedBox(height: 20),
             Center(
               child: ElevatedButton(
-                onPressed: saveRepairData,
-                child: const Text('Submit Repair'),
+                onPressed: () {
+                  if (nameController.text.trim().isEmpty ||
+                      teamController.text.trim().isEmpty ||
+                      emailController.text.trim().isEmpty ||
+                      costumeNumberController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Please fill out all required fields (Name, Team, Email, Costume #)."),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  saveRepairData();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: myColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Submit Repair',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
           ],
