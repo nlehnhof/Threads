@@ -7,7 +7,8 @@ import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:raw_threads/sidebar/sidebar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:raw_threads/providers/dance_inventory_provider.dart';
+import 'package:raw_threads/pages/profile_builds/member_profile.dart';
+
 class TeamsPage extends StatefulWidget {
   final String role;
   const TeamsPage({super.key, required this.role});
@@ -61,9 +62,7 @@ class _TeamsPageState extends State<TeamsPage> {
     });
   }
 
-  Widget _adminView(TeamProvider provider) {
-    final danceProvider = Provider.of<DanceInventoryProvider>(context);
-    
+  Widget _adminView(TeamProvider provider) {    
     return Scaffold(
       backgroundColor: myColors.secondary,
       appBar: AppBar(
@@ -74,13 +73,13 @@ class _TeamsPageState extends State<TeamsPage> {
       ),
       endDrawer: Sidebar(role: widget.role),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Teams', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+            const Text('Teams', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'Vogun')),
             const SizedBox(height: 10),
-            Text('Your Admin Code: ${provider.adminCode}', style: const TextStyle(fontSize: 18)),
+            Text(' Admin Code: ${provider.adminCode}', style: const TextStyle(fontSize: 18, color: Colors.grey)),
             const SizedBox(height: 8),
             ElevatedButton.icon(icon: const Icon(Icons.add), label: const Text('Add Team'), onPressed: () => _showAddTeamDialog(context, provider)),
             const Divider(),
@@ -113,7 +112,13 @@ class _TeamsPageState extends State<TeamsPage> {
                           Row(
                             children: [
                               Expanded(
-                                child: Text(team.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                child: Text(
+                                  team.title, 
+                                  style: const TextStyle(
+                                    fontSize: 18, 
+                                    fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                               ),
                               IconButton(icon: const Icon(Icons.edit), onPressed: () => _showEditTeamDialog(context, provider, team)),
                               IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _confirmDeleteTeam(context, provider, team)),
@@ -125,34 +130,43 @@ class _TeamsPageState extends State<TeamsPage> {
                               ? const Text('No members assigned')
                               : Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: team.members.map((uid) => Text(provider.usernameFor(uid))).toList(),
-                                ),
-                          const SizedBox(height: 8),
-                          const Text('Assigned Dances:', style: TextStyle(fontWeight: FontWeight.bold)),
-                          team.assigned.isEmpty
-                              ? const Text('No dances assigned')
-                              : Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: team.assigned.map((danceId) {
-                                    final dance = danceProvider.dances.firstWhere(
-                                      (d) => d.id == danceId
+                                  children: team.members.map((uid) {
+                                    final username = provider.usernameFor(uid);
+                                    return InkWell(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => MemberProfile(userId: uid),
+                                          ),
+                                        );
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 4),
+                                        child: Text(
+                                          username,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            color: Colors.blue, // hint it's tappable
+                                            decoration: TextDecoration.underline,
+                                          ),
+                                        ),
+                                      ),
                                     );
-                                    return Text(dance.title);
                                   }).toList(),
                                 ),
-                        ],
-                      ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
+                  ),
+                ],    
               ),
             ),
-          ],
-        ),
-      ),
-    );
+          );
   }
-
 
   Widget _userView(TeamProvider provider) {
     final team = provider.teams.firstWhere((t) => t.id == provider.assignedTeamId, orElse: () => Teams(id: '', title: 'No team assigned', members: [], assigned: []));
@@ -182,7 +196,13 @@ class _TeamsPageState extends State<TeamsPage> {
                         Text('Team: ${team.title}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 16),
                         const Text('Members:', style: TextStyle(fontWeight: FontWeight.bold)),
-                        ...team.members.map((uid) => Text(provider.usernameFor(uid))),
+                        ...team.members.map((uid) {
+                          final username = provider.usernameFor(uid);
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Text(username, style: const TextStyle(fontSize: 16)),
+                          );
+                        }),                      
                       ],
                     ),
               const Divider(),

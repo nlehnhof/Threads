@@ -17,10 +17,13 @@ class TeamProvider extends ChangeNotifier {
 
   Map<String, String> usernames = {};
   DatabaseReference? _teamsRef;
+  Query? _usersRef;
   StreamSubscription<DatabaseEvent>? _teamsSub;
+  StreamSubscription<DatabaseEvent>? _usersSub;
 
   TeamProvider({required this.adminId});
 
+  /// Initialize provider
   Future<void> init() async {
     isLoading = true;
     notifyListeners();
@@ -28,42 +31,43 @@ class TeamProvider extends ChangeNotifier {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return;
 
-    await Future.wait([
-      _loadAdminCode(),
-      _loadAllUsernames(),
-    ]);
-
-    _listenToTeams();
-
-    _assignUsers(currentUser.uid);
+    // Load admin code and user role
+    await _loadAdminCode();
     await _loadCurrentUserRole(currentUser.uid);
+
+    // Listen to teams and users in real-time
+    _listenToTeams();
+    _listenToUsernames();
 
     isLoading = false;
     notifyListeners();
   }
 
+  /// Load admin code once
   Future<void> _loadAdminCode() async {
     final snap = await _db.child('admins/$adminId/admincode').get();
-    if (snap.exists) adminCode = snap.value as String;
+    if (snap.exists && snap.value != null) {
+      adminCode = snap.value as String;
+    }
   }
 
-  Future<void> _loadAllUsernames() async {
-    final snap = await _db.child('users').orderByChild('linkedAdminId').equalTo(adminId).get();
-    if (!snap.exists) return;
-    final Map<dynamic, dynamic> data = snap.value as Map<dynamic, dynamic>;
-    usernames.clear();
-    data.forEach((uid, value) {
-      final user = Map<String, dynamic>.from(value);
-      usernames[uid] = user['username'] ?? 'Unknown';
-    });
+  /// Load current user's role
+  Future<void> _loadCurrentUserRole(String userId) async {
+    final snap = await _db.child('users/$userId').get();
+    if (snap.exists && snap.value != null) {
+      role = (snap.value as Map)['role'] ?? 'user';
+    }
   }
 
+  /// Listen to teams in real-time
   void _listenToTeams() {
     _teamsRef = _db.child('admins/$adminId/teams');
+    _teamsSub?.cancel();
+
     _teamsSub = _teamsRef!.onValue.listen((event) {
       final snapshot = event.snapshot;
-      if (snapshot.exists) {
-        final Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
+      if (snapshot.exists && snapshot.value != null) {
+        final data = Map<String, dynamic>.from(snapshot.value as Map);
         teams = data.entries
             .map((e) => Teams.fromJson(Map<String, dynamic>.from(e.value)))
             .toList();
@@ -75,15 +79,39 @@ class TeamProvider extends ChangeNotifier {
     });
   }
 
+  /// Listen to usernames of linked users in real-time
+  void _listenToUsernames() {
+    _usersRef = _db.child('users').orderByChild('linkedAdminId').equalTo(adminId);
+    _usersSub?.cancel();
+
+    _usersSub = _usersRef!.onValue.listen((event) {
+      final snapshot = event.snapshot;
+      if (!snapshot.exists || snapshot.value == null) {
+        usernames.clear();
+      } else {
+        final Map<String, dynamic> data = Map<String, dynamic>.from(snapshot.value as Map);
+        usernames = data.map((uid, value) {
+          final user = Map<String, dynamic>.from(value);
+          return MapEntry(uid, user['username'] ?? 'Unknown');
+        });
+      }
+      _assignUsers(FirebaseAuth.instance.currentUser!.uid);
+      notifyListeners();
+    });
+  }
+
+  /// Assign unassigned users and set current user's team
   void _assignUsers(String currentUserId) {
     unassignedUsers.clear();
     assignedTeamId = null;
+
     for (var entry in usernames.entries) {
       final uid = entry.key;
       final team = teams.firstWhere(
         (t) => t.members.contains(uid),
         orElse: () => Teams(id: '', title: '', members: [], assigned: []),
       );
+
       if (team.id.isEmpty) {
         unassignedUsers.add({'uid': uid, 'username': entry.value});
       } else if (uid == currentUserId) {
@@ -92,18 +120,12 @@ class TeamProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadCurrentUserRole(String userId) async {
-    final snap = await _db.child('users/$userId').get();
-    if (snap.exists) role = (snap.value as Map)['role'] ?? 'user';
-  }
-
   // --- Team CRUD ---
   Future<void> addTeam(String title) async {
     final teamId = _db.child('admins/$adminId/teams').push().key!;
     final newTeam = Teams(id: teamId, title: title, members: [], assigned: []);
     await _db.child('admins/$adminId/teams/$teamId').set(newTeam.toJson());
 
-    // Update locally for instant UI feedback
     teams.add(newTeam);
     notifyListeners();
   }
@@ -165,6 +187,7 @@ class TeamProvider extends ChangeNotifier {
   @override
   void dispose() {
     _teamsSub?.cancel();
+    _usersSub?.cancel();
     super.dispose();
   }
 }

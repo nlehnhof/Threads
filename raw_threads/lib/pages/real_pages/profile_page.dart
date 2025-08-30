@@ -61,7 +61,6 @@ class _ProfilePageState extends State<ProfilePage> {
       backgroundColor: myColors.secondary,
       appBar: AppBar(
         backgroundColor: myColors.primary,
-        leading: Image.asset('assets/threadline_logo.png', height: 30),
         title: Text('Profile', style: TextStyle(fontFamily: 'Vogun', fontSize: 28, color: myColors.secondary)),
         centerTitle: true,
         actions: [

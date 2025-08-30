@@ -17,26 +17,24 @@ class Teams {
 
   factory Teams.fromJson(Map<String, dynamic> json) {
     return Teams(
-      id: json['id'],
+      id: json['id'] ?? uuid.v4(), // generate id if missing
       title: json['title'] ?? 'No Team Assigned',
-      members: json['members'],
-      assigned: json['assigned'],
+      members: (json['members'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+      assigned: (json['assigned'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'title': title,
-    'members': members,
-    'assigned': assigned,
-  };
+        'id': id,
+        'title': title,
+        'members': members,
+        'assigned': assigned,
+      };
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Teams &&
-      runtimeType == other.runtimeType &&
-      id == other.id;
+      other is Teams && runtimeType == other.runtimeType && id == other.id;
 
   @override
   int get hashCode => id.hashCode;
