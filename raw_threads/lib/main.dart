@@ -48,6 +48,7 @@ class MyApp extends StatelessWidget {
             home: Scaffold(
               body: Center(child: CircularProgressIndicator()),
             ),
+            debugShowCheckedModeBanner: false,
           );
         }
 
@@ -55,7 +56,7 @@ class MyApp extends StatelessWidget {
 
         // User is logged out → show WelcomePage
         if (user == null) {
-          return const MaterialApp(home: WelcomePage());
+          return const MaterialApp(home: WelcomePage(), debugShowCheckedModeBanner: false,);
         }
 
         // Initialize AppState if not yet initialized
@@ -66,6 +67,7 @@ class MyApp extends StatelessWidget {
             home: Scaffold(
               body: Center(child: CircularProgressIndicator()),
             ),
+            debugShowCheckedModeBanner: false,
           );
         }
 
@@ -75,7 +77,7 @@ class MyApp extends StatelessWidget {
 
         if (adminId == null || role == null) {
           // Initialization completed but missing data → fallback
-          return const MaterialApp(home: WelcomePage());
+          return const MaterialApp(home: WelcomePage(), debugShowCheckedModeBanner: false,);
         }
 
         // MultiProvider wraps all app data providers
