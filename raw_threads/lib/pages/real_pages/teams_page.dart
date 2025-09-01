@@ -182,40 +182,62 @@ class _TeamsPageState extends State<TeamsPage> {
       endDrawer: Sidebar(role: widget.role),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Team', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              team.id.isEmpty
-                  ? const Text('You are not assigned to any team yet.')
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Team: ${team.title}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 16),
-                        const Text('Members:', style: TextStyle(fontWeight: FontWeight.bold)),
-                        ...team.members.map((uid) {
-                          final username = provider.usernameFor(uid);
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Text(username, style: const TextStyle(fontSize: 16)),
-                          );
-                        }),                      
-                      ],
-                    ),
-              const Divider(),
-              const Text('Link to Another Admin', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _adminCodeController,
-                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Admin Code', hintText: 'Enter admin code to link'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Team', style: TextStyle(fontFamily: "Vogun", fontSize: 32, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 10),
+                    team.id.isEmpty
+                        ? const Text('You are not assigned to any team yet.')
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(team.title, style: const TextStyle(fontSize: 20, color: Colors.black87)),
+                              const SizedBox(height: 16),
+                              const Text('Members:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                              ...team.members.map((uid) {
+                                final username = provider.usernameFor(uid);
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Text(username, style: const TextStyle(fontSize: 16)),
+                                );
+                              }),
+                            ],
+                          ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
-              ElevatedButton(onPressed: () => _linkAdminCode(context, provider), child: const Text('Link Admin')),
-            ],
+            ),
+
+            // Bottom section pinned after scrollable content
+            const Divider(),
+            Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Link to Another Admin',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _adminCodeController,
+                  decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'Admin Code',
+                      hintText: 'Enter admin code to link'),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton(
+                    onPressed: () => _linkAdminCode(context, provider),
+                    child: const Text('Link Admin')),
+              ],
+            ),
           ),
+        ],
         ),
       ),
     );

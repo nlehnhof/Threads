@@ -21,7 +21,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
   List<bool> isSelected = [true, false];
   bool isLoading = false;
-  final _firebaseInitialized = false;
 
   @override
   void initState() {
@@ -124,13 +123,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_firebaseInitialized) {
-      // Show splash/loading while Firebase initializes
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return Scaffold(
       backgroundColor: myColors.primary,
       appBar: AppBar(

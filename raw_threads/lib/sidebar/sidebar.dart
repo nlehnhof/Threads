@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:raw_threads/account/app_state.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
-import 'package:raw_threads/pages/real_pages/welcome_page.dart';
 import 'package:raw_threads/pages/real_pages/home_page.dart';
 import 'package:raw_threads/pages/real_pages/new_inv_page.dart';
 import 'package:raw_threads/pages/real_pages/repair_page.dart';
 import 'package:raw_threads/pages/real_pages/profile_page.dart';
 import 'package:raw_threads/pages/real_pages/teams_page.dart';
 import 'package:raw_threads/sidebar/sidebar_item.dart';
+import 'package:provider/provider.dart';
 
 class Sidebar extends StatelessWidget {
   final String role;
@@ -80,17 +81,14 @@ class Sidebar extends StatelessWidget {
                         children: [
                           TextButton(
                             onPressed: () async {
-                              Navigator.pop(context); // close dialog first
+                              Navigator.pop(context); // close dialog
                               await FirebaseAuth.instance.signOut();
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => WelcomePage()),
-                              );
+                              context.read<AppState>().reset();
                             },
-                            child: Text('Logout',
-                                style: TextStyle(
-                                    fontSize: 18, color: myColors.secondary)),
+                            child: Text(
+                              'Logout',
+                              style: TextStyle(fontSize: 18, color: myColors.secondary),
+                            ),
                           ),
                           TextButton(
                             onPressed: () => Navigator.pop(context),

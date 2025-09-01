@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
+import 'package:raw_threads/classes/main_classes/app_user.dart';
 
 ValueNotifier<AuthService> authService = ValueNotifier(AuthService());
 
@@ -25,6 +26,7 @@ class AuthService {
 
       if (user != null) {
         final userData = {
+          'id': user.uid,
           'email': email,
           'role': role,
           'username': '',
@@ -199,12 +201,32 @@ class AuthService {
     }
   }
 
-  Future<UserCredential> signIn({
+  Future<AppUser> signIn({
     required String email,
     required String password,
-  }) async {
-    return await _auth.signInWithEmailAndPassword(email: email, password: password);
-  }
+    }) async {
+      try {
+        UserCredential result = await _auth.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );  
+
+        final user = result.user;
+        if (user == null) throw Exception("Firebase user is null");
+
+        final snapshot = await _dbRef.child('users').child(user.uid).get();
+
+        if (!snapshot.exists || snapshot.value == null) {
+          throw Exception("User data not found in database");
+        }
+
+        final data = Map<String, dynamic>.from(snapshot.value as Map);
+        data['id'] = user.uid;
+        return AppUser.fromJson(data);
+      } catch (e) {
+        rethrow;
+      }
+    }
 
   User? get currentUser => _auth.currentUser;
 

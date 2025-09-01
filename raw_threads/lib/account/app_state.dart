@@ -1,10 +1,9 @@
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 class AppState extends ChangeNotifier {
   String? _adminId;
-  String? _role;       // e.g., 'admin' or 'user'
+  String? _role;       // 'admin' or 'user'
   String? _adminCode;
   bool _isInitialized = false;
 
@@ -13,7 +12,6 @@ class AppState extends ChangeNotifier {
   String? get adminCode => _adminCode;
   bool get isInitialized => _isInitialized;
 
-  // Setter for adminId with notification
   void setAdminId(String? id) {
     if (_adminId != id) {
       _adminId = id;
@@ -21,7 +19,6 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  // Setter for role with notification
   void setRole(String? newRole) {
     if (_role != newRole) {
       _role = newRole;
@@ -29,7 +26,6 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  // Setter for adminCode with notification
   void setAdminCode(String? code) {
     if (_adminCode != code) {
       _adminCode = code;
@@ -37,83 +33,56 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  void clearAdmin() {
+  void reset() {
     _adminId = null;
     _role = null;
     _adminCode = null;
+    _isInitialized = false;
     notifyListeners();
   }
 
-  /// Initializes AppState by checking current user info and linked admin
-  Future<void> initialize() async {
+  Future<void> initialize({String? uid}) async {
     _isInitialized = false;
     notifyListeners();
 
+    if (uid == null) {
+      reset();
+      _isInitialized = true;
+      notifyListeners();
+      return;
+    }
+
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final userSnap = await FirebaseDatabase.instance.ref('users/$uid').get();
+      final userData = userSnap.exists ? Map<String, dynamic>.from(userSnap.value as Map) : {};
 
-      if (user == null) {
-        // No logged-in user
-        _adminId = null;
-        _role = null;
+      final String roleFromDb = userData['role'] as String? ?? 'user';
+      _role = roleFromDb;
+
+      if (roleFromDb == 'admin') {
+        _adminId = uid;
         _adminCode = null;
-        _isInitialized = true;
-        notifyListeners();
-        return;
-      }
-
-      // Fetch user role from database or infer from Auth or custom claims
-      // Example: check 'users/{uid}/role' in Firebase DB
-      final userRoleSnap = await FirebaseDatabase.instance
-          .ref('users/${user.uid}/role')
-          .get();
-
-      if (userRoleSnap.exists && userRoleSnap.value != null) {
-        _role = userRoleSnap.value as String;
       } else {
-        // Default or fallback role, e.g., 'user'
-        _role = 'user';
-      }
+        final String? linkedCode = userData['linkedAdminCode'] as String?;
+        _adminCode = linkedCode;
+        _adminId = null;
 
-      // If user is admin, adminId is own uid
-      if (_role == 'admin') {
-        _adminId = user.uid;
-        _adminCode = null; // Admin code not needed for admin themselves
-      } else {
-        // For regular user, fetch linked adminCode and find matching adminId
-        final adminCodeSnap = await FirebaseDatabase.instance
-            .ref('users/${user.uid}/linkedAdminCode')
-            .get();
-
-        if (adminCodeSnap.exists && adminCodeSnap.value != null) {
-          _adminCode = adminCodeSnap.value as String;
-
-          // Find adminId by adminCode
+        if (linkedCode != null) {
           final adminsSnap = await FirebaseDatabase.instance.ref('admins').get();
-
           if (adminsSnap.exists) {
-            String? foundAdminId;
             for (final adminEntry in adminsSnap.children) {
               final codeSnap = adminEntry.child('admincode');
-              if (codeSnap.exists && codeSnap.value == _adminCode) {
-                foundAdminId = adminEntry.key;
+              if (codeSnap.exists && codeSnap.value == linkedCode) {
+                _adminId = adminEntry.key;
                 break;
               }
             }
-            _adminId = foundAdminId;
-          } else {
-            _adminId = null;
           }
-        } else {
-          _adminId = null;
-          _adminCode = null;
         }
       }
     } catch (e) {
       debugPrint('Error initializing AppState: $e');
-      _adminId = null;
-      _adminCode = null;
-      _role = null;
+      reset();
     }
 
     _isInitialized = true;
