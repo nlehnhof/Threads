@@ -5,7 +5,7 @@ import 'package:raw_threads/pages/real_pages/home_page.dart';
 import 'package:raw_threads/services/auth_service.dart';
 import 'package:raw_threads/classes/style_classes/primary_button.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
-
+import 'package:firebase_database/firebase_database.dart';
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -33,6 +33,18 @@ class _LoginPageState extends State<LoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+
+      // Ensure user record exists
+      final userRef = FirebaseDatabase.instance.ref("users/${appUser.id}");
+      final snapshot = await userRef.get();
+
+      if (!snapshot.exists) {
+        await userRef.set({
+          "email": appUser.email,
+          "role": "user", // default unless you assign admin manually
+          "linkedAdminCode": null,
+        });
+      }
 
       final appState = context.read<AppState>();
       await appState.initialize(uid: appUser.id);
