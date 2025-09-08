@@ -34,9 +34,12 @@ class _RepairSummaryPageState extends State<RepairSummaryPage> {
     _generateThumbnail();
   }
 
+  /// Only generate thumbnail for local photo uploads, skip if URL
   Future<void> _generateThumbnail() async {
     final photoPath = widget.repair.photoPath;
-    if (photoPath != null && photoPath.isNotEmpty) {
+    if (photoPath != null &&
+        photoPath.isNotEmpty &&
+        !photoPath.startsWith('http')) {
       final file = File(photoPath);
       final thumb = await _compressImage(file);
       if (mounted && thumb != null) {
@@ -71,8 +74,9 @@ class _RepairSummaryPageState extends State<RepairSummaryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final costume = context.read<CostumesProvider>().getCostumeById(widget.repair.costumeId);
-    final title = costume.title;
+    final costume =
+        context.read<CostumesProvider>().getCostumeById(widget.repair.costumeId);
+    final title = costume?.title ?? 'Costume';
 
     return Scaffold(
       backgroundColor: myColors.secondary,
@@ -81,14 +85,16 @@ class _RepairSummaryPageState extends State<RepairSummaryPage> {
         elevation: 0,
         title: Text(
           '${widget.repair.name} - $title Repair',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Vogun', fontSize: 24),
+          style: const TextStyle(
+              fontWeight: FontWeight.bold, fontFamily: 'Vogun', fontSize: 24),
         ),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => RepairPage(role: widget.role)),
+                MaterialPageRoute(
+                    builder: (_) => RepairPage(role: widget.role)),
               );
             },
             child: const Text(
@@ -116,8 +122,9 @@ class _RepairSummaryPageState extends State<RepairSummaryPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("Repair Details",
-                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                          const Text("Repair Details",
+                              style: TextStyle(
+                                  fontSize: 20, fontWeight: FontWeight.bold)),
                           const Divider(),
                           _buildDetailRow("Name", widget.repair.name),
                           const SizedBox(height: 4),
@@ -146,15 +153,22 @@ class _RepairSummaryPageState extends State<RepairSummaryPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text("Selected Issues",
-                                style: Theme.of(context).textTheme.titleMedium),
+                            const Text("Selected Issues",
+                                style: TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 8),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: widget.repair.issues.map((e) {
                                 return ListTile(
-                                  leading: const Icon(Icons.check,
-                                      color: Colors.grey),
+                                  leading: e.image != null && e.image!.isNotEmpty
+                                      ? Image.network(
+                                          e.image!,
+                                          width: 40,
+                                          height: 40,
+                                          fit: BoxFit.cover,
+                                        )
+                                      : const Icon(Icons.check, color: Colors.grey),
                                   title: Text(e.title),
                                 );
                               }).toList(),
@@ -167,24 +181,22 @@ class _RepairSummaryPageState extends State<RepairSummaryPage> {
                   const SizedBox(height: 16),
 
                   // Photo card
-                  if (_thumbnailFile != null ||
-                      (widget.repair.photoPath != null &&
-                          widget.repair.photoPath!.isNotEmpty))
+                  if (widget.repair.photoPath != null &&
+                      widget.repair.photoPath!.isNotEmpty)
                     Card(
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                       elevation: 3,
                       clipBehavior: Clip.antiAlias,
-                      child: Column(
-                        children: [
-                          if (_thumbnailFile != null)
-                            Image.file(_thumbnailFile!, height: 220, fit: BoxFit.cover)
-                          else
-                            Image.file(File(widget.repair.photoPath!),
-                                height: 220, fit: BoxFit.cover),
-                        ],
-                      ),
+                      child: widget.repair.photoPath!.startsWith('http')
+                          ? Image.network(widget.repair.photoPath!,
+                              height: 220, fit: BoxFit.cover)
+                          : (_thumbnailFile != null
+                              ? Image.file(_thumbnailFile!,
+                                  height: 220, fit: BoxFit.cover)
+                              : Image.file(File(widget.repair.photoPath!),
+                                  height: 220, fit: BoxFit.cover)),
                     ),
 
                   const SizedBox(height: 24),
@@ -221,8 +233,11 @@ class _RepairSummaryPageState extends State<RepairSummaryPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text("$label: ",
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          Expanded(child: Text(value?.isNotEmpty == true ? value! : "Not Given", style: TextStyle(fontSize: 18))),
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          Expanded(
+              child: Text(value?.isNotEmpty == true ? value! : "Not Given",
+                  style: const TextStyle(fontSize: 18))),
         ],
       ),
     );

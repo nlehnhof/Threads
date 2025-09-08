@@ -40,7 +40,7 @@ dependencies:
   shared_preferences: ^2.0.13
   collection: ^1.17.0
   flutter_image_compress: ^2.4.0
-  firebase_storage: ^13.0.0
+  firebase_storage: ^13.0.1
   cached_network_image: ^3.2.3
   provider: ^6.1.5
 

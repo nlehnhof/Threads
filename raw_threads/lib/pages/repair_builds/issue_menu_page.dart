@@ -2,11 +2,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:raw_threads/classes/main_classes/issues.dart';
-import 'dart:async';
+import 'package:provider/provider.dart';
 import 'package:raw_threads/providers/issues_provider.dart';
 import 'package:raw_threads/account/app_state.dart';
-import 'package:provider/provider.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:uuid/uuid.dart';
+
+final uuid = Uuid();
 
 class IssueMenuPage extends StatefulWidget {
   const IssueMenuPage({super.key});
@@ -17,6 +21,24 @@ class IssueMenuPage extends StatefulWidget {
 
 class _IssueMenuPageState extends State<IssueMenuPage> {
   final TextEditingController _titleController = TextEditingController();
+
+  Future<String?> _uploadImage(File file) async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return null;
+
+      final storageRef = FirebaseStorage.instance.ref(
+        'admins/${currentUser.uid}/issues/${uuid.v4()}.jpg',
+      );
+
+      final snapshot = await storageRef.putFile(file);
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      debugPrint("Image upload failed: $e");
+      return null;
+    }
+  }
 
   Future<void> _addIssue() async {
     final provider = context.read<IssuesProvider>();
@@ -60,11 +82,15 @@ class _IssueMenuPageState extends State<IssueMenuPage> {
     );
     if (title == null || title.isEmpty) return;
 
-    // Create issue
+    // Upload image
+    final uploadedUrl = await _uploadImage(File(picked.path));
+    if (uploadedUrl == null) return;
+
+    // Create issue with URL
     final newIssue = Issues(
       id: uuid.v4(),
       title: title,
-      image: picked.path,
+      image: uploadedUrl,
     );
 
     await provider.add(newIssue);
@@ -90,9 +116,9 @@ class _IssueMenuPageState extends State<IssueMenuPage> {
             fontSize: 24,
             fontFamily: 'Vogun',
             fontWeight: FontWeight.bold,
-            ),
           ),
         ),
+      ),
       floatingActionButton: isAdmin
           ? FloatingActionButton(
               onPressed: _addIssue,
@@ -127,30 +153,32 @@ class _IssueMenuPageState extends State<IssueMenuPage> {
                       aspectRatio: 1,
                       child: Card(
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         clipBehavior: Clip.antiAlias,
                         elevation: 4,
-                        child: Image.file(
-                          File(issue.image ?? ''),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              const Icon(Icons.broken_image),
-                          ),
-                        ),
+                        child: issue.image != null && issue.image!.isNotEmpty
+                            ? Image.network(
+                                issue.image!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    const Icon(Icons.broken_image),
+                              )
+                            : const Icon(Icons.broken_image),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        issue.title,
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      issue.title,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
-                      ),
-                  ],               
+                    ),
+                  ],
                 ),
               );
             },

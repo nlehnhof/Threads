@@ -56,6 +56,8 @@ class _CostumePageState extends State<CostumePage> {
         allowDelete: existing != null,
         onSave: (costume) => Navigator.pop(context, costume),
         role: widget.role,
+        danceId: widget.dance.id,
+        gender: widget.gender,
       ),
     );
 

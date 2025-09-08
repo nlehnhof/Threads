@@ -4,6 +4,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
+import 'package:raw_threads/account/app_state.dart';
+import 'package:provider/provider.dart';
+
+import 'package:raw_threads/services/storage_service.dart'; // import the helper
 
 final uuid = Uuid();
 
@@ -20,17 +24,19 @@ class AddGenericDialog extends StatefulWidget {
 class _AddGenericDialogState extends State<AddGenericDialog> {
   final titleController = TextEditingController();
   final totalController = TextEditingController();
+  final availableController = TextEditingController();
   final countryController = TextEditingController();
   final regionController = TextEditingController();
-  final availableController = TextEditingController();
 
   File? selectedLeftImage;
   File? selectedRightImage;
 
+  bool isUploadingLeft = false;
+  bool isUploadingRight = false;
+
   @override
   void initState() {
     super.initState();
-
     if (widget.dance != null) {
       final dance = widget.dance!;
       titleController.text = dance.title;
@@ -38,30 +44,19 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
       availableController.text = dance.available.toString();
       countryController.text = dance.country;
       regionController.text = '';
-      selectedLeftImage = dance.leftImagePath != null ? File(dance.leftImagePath!) : null;
-      selectedRightImage = dance.rightImagePath != null ? File(dance.rightImagePath!) : null;
+      // We will ignore local File paths now; always upload new images
     }
 
-    // Add listeners to update form validation state on input changes
     titleController.addListener(_onTextChanged);
     totalController.addListener(_onTextChanged);
     availableController.addListener(_onTextChanged);
     countryController.addListener(_onTextChanged);
   }
 
-  void _onTextChanged() {
-    setState(() {
-      // triggers rebuild so isFormValid is reevaluated
-    });
-  }
+  void _onTextChanged() => setState(() {}); // triggers form validation rebuild
 
   @override
   void dispose() {
-    titleController.removeListener(_onTextChanged);
-    totalController.removeListener(_onTextChanged);
-    availableController.removeListener(_onTextChanged);
-    countryController.removeListener(_onTextChanged);
-
     titleController.dispose();
     totalController.dispose();
     availableController.dispose();
@@ -70,16 +65,14 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
     super.dispose();
   }
 
+  /// Pick image from gallery and set local file
   Future<void> pickImage(bool isLeft) async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked != null) {
       setState(() {
-        if (isLeft) {
-          selectedLeftImage = File(picked.path);
-        } else {
-          selectedRightImage = File(picked.path);
-        }
+        if (isLeft) selectedLeftImage = File(picked.path);
+        else selectedRightImage = File(picked.path);
       });
     }
   }
@@ -93,6 +86,7 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final adminId = context.read<AppState>().adminId;
     return Dialog(
       backgroundColor: const Color(0xFFEFF2EF),
       insetPadding: const EdgeInsets.all(20),
@@ -101,27 +95,16 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Align(
                 alignment: Alignment.topLeft,
                 child: TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(color: Colors.grey),
-                  ),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Add costume',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Georgia',
-                ),
-              ),
+              const Text('Add costume', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600, fontFamily: 'Georgia')),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -134,21 +117,13 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
-                          image: selectedLeftImage != null
-                              ? DecorationImage(
-                                  image: FileImage(selectedLeftImage!),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
+                          image: selectedLeftImage != null ? DecorationImage(
+                            image: FileImage(selectedLeftImage!),
+                            fit: BoxFit.cover,
+                          ) : null,
                         ),
                         child: selectedLeftImage == null
-                            ? const Center(
-                                child: Icon(
-                                  Icons.image_outlined,
-                                  color: Colors.grey,
-                                  size: 30,
-                                ),
-                              )
+                            ? const Center(child: Icon(Icons.image_outlined, color: Colors.grey, size: 30))
                             : null,
                       ),
                     ),
@@ -162,21 +137,13 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
-                          image: selectedRightImage != null
-                              ? DecorationImage(
-                                  image: FileImage(selectedRightImage!),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
+                          image: selectedRightImage != null ? DecorationImage(
+                            image: FileImage(selectedRightImage!),
+                            fit: BoxFit.cover,
+                          ) : null,
                         ),
                         child: selectedRightImage == null
-                            ? const Center(
-                                child: Icon(
-                                  Icons.image_outlined,
-                                  color: Colors.grey,
-                                  size: 30,
-                                ),
-                              )
+                            ? const Center(child: Icon(Icons.image_outlined, color: Colors.grey, size: 30))
                             : null,
                       ),
                     ),
@@ -184,92 +151,60 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
                 ],
               ),
               const SizedBox(height: 16),
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                  labelText: "Costume name",
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(12)),
-                  ),
-                ),
-              ),
+              // Text fields for title, total, available, country, region
+              _buildTextField(titleController, 'Costume name'),
               const SizedBox(height: 12),
-              TextField(
-                controller: totalController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: "How many full costumes do you have?",
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(12)),
-                  ),
-                ),
-              ),
+              _buildTextField(totalController, 'How many full costumes?', isNumber: true),
               const SizedBox(height: 12),
-              TextField(
-                controller: availableController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: "How many are currently available?",
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(12)),
-                  ),
-                ),
-              ),
+              _buildTextField(availableController, 'How many are currently available?', isNumber: true),
               const SizedBox(height: 12),
-              TextField(
-                controller: countryController,
-                decoration: const InputDecoration(
-                  labelText: "Country of origin",
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(12)),
-                  ),
-                ),
-              ),
+              _buildTextField(countryController, 'Country of origin'),
               const SizedBox(height: 12),
-              TextField(
-                controller: regionController,
-                decoration: const InputDecoration(
-                  labelText: "Region",
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(12)),
-                  ),
-                ),
-              ),
+              _buildTextField(regionController, 'Region'),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: isFormValid
-                      ? () {
+                  onPressed: isFormValid && adminId != null
+                      ? () async {
+                          String? leftUrl, rightUrl;
+                          if (selectedLeftImage != null) {
+                            setState(() => isUploadingLeft = true);
+                            leftUrl = await StorageHelper.uploadFile(
+                              storagePath: 'admins/$adminId/dances/',
+                              file: selectedLeftImage!,
+                            );
+                            setState(() => isUploadingLeft = false);
+                          }
+                          if (selectedRightImage != null) {
+                            setState(() => isUploadingRight = true);
+                            rightUrl = await StorageHelper.uploadFile(
+                              storagePath: 'admins/$adminId/dances/',
+                              file: selectedRightImage!,
+                            );
+                            setState(() => isUploadingRight = false);
+                          }
+
                           final danceToSave = widget.dance != null
-                            ? widget.dance!.copyWith(
-                                title: titleController.text.trim(),
-                                country: countryController.text.trim(),
-                                available: int.tryParse(availableController.text.trim()) ?? 0,
-                                total: int.tryParse(totalController.text.trim()) ?? 0,
-                                leftImagePath: selectedLeftImage?.path,
-                                rightImagePath: selectedRightImage?.path,
-                              )
-                            : Dances(
-                                id: uuid.v4(),
-                                title: titleController.text.trim(),
-                                country: countryController.text.trim(),
-                                available: int.tryParse(availableController.text.trim()) ?? 0,
-                                total: int.tryParse(totalController.text.trim()) ?? 0,
-                                category: Category.prepped,
-                                leftImagePath: selectedLeftImage?.path,
-                                rightImagePath: selectedRightImage?.path,
-                              );
+                              ? widget.dance!.copyWith(
+                                  title: titleController.text.trim(),
+                                  country: countryController.text.trim(),
+                                  available: int.tryParse(availableController.text.trim()) ?? 0,
+                                  total: int.tryParse(totalController.text.trim()) ?? 0,
+                                  leftImagePath: leftUrl ?? widget.dance!.leftImagePath,
+                                  rightImagePath: rightUrl ?? widget.dance!.rightImagePath,
+                                )
+                              : Dances(
+                                  id: uuid.v4(),
+                                  title: titleController.text.trim(),
+                                  country: countryController.text.trim(),
+                                  available: int.tryParse(availableController.text.trim()) ?? 0,
+                                  total: int.tryParse(totalController.text.trim()) ?? 0,
+                                  category: Category.prepped,
+                                  leftImagePath: leftUrl,
+                                  rightImagePath: rightUrl,
+                                );
+
                           Navigator.pop(context);
                           widget.onSubmit(danceToSave);
                         }
@@ -277,19 +212,29 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: myColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text(
-                    'Continue',
-                    style: TextStyle(color: Colors.white),
-                  ),
+                  child: (isUploadingLeft || isUploadingRight)
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('Continue', style: TextStyle(color: Colors.white)),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label, {bool isNumber = false}) {
+    return TextField(
+      controller: controller,
+      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: Colors.white,
+        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
       ),
     );
   }

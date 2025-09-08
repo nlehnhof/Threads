@@ -9,8 +9,10 @@ import 'package:raw_threads/classes/main_classes/repairs.dart';
 import 'package:raw_threads/providers/repair_provider.dart';
 import 'package:raw_threads/providers/issues_provider.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
-import 'repair_summary_page.dart';
+import 'package:raw_threads/pages/repair_builds/repair_summary_page.dart';
 import 'package:uuid/uuid.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 final uuid = Uuid();
 
@@ -39,6 +41,7 @@ class RepairDetailsPage extends StatefulWidget {
 class _RepairDetailsPageState extends State<RepairDetailsPage> {
   List<Map<String, dynamic>> issueOptions = [];
   File? photo;
+  String? _uploadedPhotoUrl;
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController teamController = TextEditingController();
@@ -47,7 +50,6 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
   final TextEditingController commentController = TextEditingController();
 
   bool get isAdmin => widget.role == 'admin';
-
   Repairs? existingRepair;
 
   @override
@@ -74,6 +76,7 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
             'selected': true,
           };
         }).toList();
+        _uploadedPhotoUrl = repair.photoPath;
       }
     }
   }
@@ -99,6 +102,24 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
     });
   }
 
+  Future<String?> _uploadRepairPhoto(File file) async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return null;
+
+      final storageRef = FirebaseStorage.instance.ref(
+        'admins/${currentUser.uid}/repairs/${uuid.v4()}.jpg',
+      );
+
+      final snapshot = await storageRef.putFile(file);
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      debugPrint("Repair photo upload failed: $e");
+      return null;
+    }
+  }
+
   Future<void> pickImage() async {
     final picker = ImagePicker();
     final source = await showDialog<ImageSource>(
@@ -120,54 +141,18 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
 
     if (source == null) return;
 
-    final file = await picker.pickImage(source: source);
-    if (file != null) {
-      setState(() => photo = File(file.path));
+    final picked = await picker.pickImage(source: source);
+    if (picked == null) return;
+
+    final file = File(picked.path);
+    final uploadedUrl = await _uploadRepairPhoto(file);
+
+    if (uploadedUrl != null) {
+      setState(() {
+        photo = file;
+        _uploadedPhotoUrl = uploadedUrl;
+      });
     }
-  }
-
-  Widget buildIssueCard(Map<String, dynamic> issue, int index) {
-    final selected = issue['selected'] == true;
-    final imageSource = issue['image'];
-    Widget imageWidget;
-
-    if (imageSource != null && imageSource.startsWith('http')) {
-      imageWidget = Image.network(imageSource, width: 100, height: 100, fit: BoxFit.cover);
-    } else if (imageSource != null && imageSource.isNotEmpty) {
-      imageWidget = Image.file(File(imageSource), width: 100, height: 100, fit: BoxFit.cover);
-    } else {
-      imageWidget = const Icon(Icons.broken_image, size: 100);
-    }
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          issueOptions[index]['selected'] = !selected;
-        });
-      },
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Opacity(opacity: selected ? 0.5 : 1.0, child: imageWidget),
-          if (selected)
-            Container(
-              width: 100,
-              height: 100,
-              color: Colors.black45,
-              alignment: Alignment.center,
-              child: Text(
-                issue['title'],
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-        ],
-      ),
-    );
   }
 
   Future<void> saveRepairData() async {
@@ -178,7 +163,7 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
         .map((i) => Issues(
               id: i['id'] ?? uuid.v4(),
               title: i['title'],
-              image: i['image'],
+              image: i['image'], // Use URL from issue menu
             ))
         .toList();
 
@@ -197,38 +182,31 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
       issues: issues,
       comments: commentController.text,
       completed: false,
+      photoPath: _uploadedPhotoUrl,
     );
 
-    // Add/update in provider (and Firebase)
     if (existingRepair != null) {
       await provider.update(repair);
     } else {
       await provider.add(repair);
     }
 
-    // Navigate to summary page
     if (context.mounted) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => RepairSummaryPage(
-            repair: repair,
-            role: widget.role,
-          ),
+          builder: (_) => RepairSummaryPage(repair: repair, role: widget.role),
         ),
       );
     }
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    int maxLines = 1,
-  }) {
+  Widget _buildTextField(
+      {required TextEditingController controller,
+      required String label,
+      int maxLines = 1}) {
     return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 2,
       margin: const EdgeInsets.symmetric(vertical: 6),
       child: Padding(
@@ -236,16 +214,11 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
         child: TextField(
           controller: controller,
           maxLines: maxLines,
-          decoration: InputDecoration(
-            labelText: label,
-            border: InputBorder.none, // removes underline
-          ),
+          decoration: InputDecoration(labelText: label, border: InputBorder.none),
         ),
       ),
     );
   }
-
-
 
   @override
   void dispose() {
@@ -269,7 +242,7 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
         orElse: () => {
           'title': issue.title,
           'image': issue.image,
-          'selected': false
+          'selected': false,
         },
       );
       return {
@@ -286,160 +259,158 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
         elevation: 0,
         title: Text(
           '${widget.dance.title} - ${widget.costume.title}',
-          style: const TextStyle(color: Colors.black, fontFamily: 'Vogun', fontSize: 32, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+              color: Colors.black,
+              fontFamily: 'Vogun',
+              fontSize: 32,
+              fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.black),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'What needs fixing?',
-              style: TextStyle(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text(
+            'What needs fixing?',
+            style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: Colors.black,
-                fontFamily: 'Vogun',
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Issues grid
-            allIssues.isEmpty
-                ? const Text("No issues found. Add some to the Issue Menu.")
-                : GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: issueOptions.length,
-                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 150, // square cards
+                fontFamily: 'Vogun'),
+          ),
+          const SizedBox(height: 12),
+          allIssues.isEmpty
+              ? const Text("No issues found. Add some to the Issue Menu.")
+              : GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: issueOptions.length,
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 150,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
-                      childAspectRatio: 0.8, // room for title
+                      childAspectRatio: 0.8),
+                  itemBuilder: (_, index) {
+                    final issue = issueOptions[index];
+                    final selected = issue['selected'] == true;
+                    final imageUrl = issue['image'];
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          issueOptions[index]['selected'] = !selected;
+                        });
+                      },
+                      child: Column(
+                        children: [
+                          AspectRatio(
+                            aspectRatio: 1,
+                            child: Card(
+                              elevation: selected ? 6 : 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  if (imageUrl != null && imageUrl.isNotEmpty)
+                                    Image.network(
+                                      imageUrl,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          const Icon(Icons.broken_image),
+                                    )
+                                  else
+                                    const Icon(Icons.broken_image),
+                                  if (selected)
+                                    Container(
+                                      color: Colors.black45,
+                                      child: const Icon(Icons.check,
+                                          color: Colors.white, size: 40),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            issue['title'],
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+          const SizedBox(height: 24),
+          _buildTextField(controller: nameController, label: 'Name'),
+          _buildTextField(controller: teamController, label: 'Team'),
+          _buildTextField(controller: emailController, label: 'Email'),
+          _buildTextField(
+              controller: costumeNumberController, label: 'Costume Number(s)'),
+          _buildTextField(controller: commentController, label: 'Comments'),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: pickImage,
+            child: Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SizedBox(
+                height: 200,
+                width: double.infinity,
+                child: Center(
+                  child: photo != null
+                      ? Image.file(photo!, fit: BoxFit.cover, width: double.infinity)
+                      : _uploadedPhotoUrl != null
+                          ? Image.network(_uploadedPhotoUrl!, fit: BoxFit.cover)
+                          : const Text('Tap to take a picture'),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: ElevatedButton(
+              onPressed: () {
+                if (nameController.text.trim().isEmpty ||
+                    teamController.text.trim().isEmpty ||
+                    emailController.text.trim().isEmpty ||
+                    costumeNumberController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                          "Please fill out all required fields (Name, Team, Email, Costume #)."),
+                      backgroundColor: Colors.red,
                     ),
-                    itemBuilder: (_, index) {
-                      final issue = issueOptions[index];
-                      final selected = issue['selected'] == true;
+                  );
+                  return;
+                }
 
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            issueOptions[index]['selected'] = !selected;
-                          });
-                        },
-                        child: Column(
-                          children: [
-                            AspectRatio(
-                              aspectRatio: 1, // square image
-                              child: Card(
-                                elevation: selected ? 6 : 2,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                clipBehavior: Clip.antiAlias,
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    issue['image'] != null &&
-                                            issue['image'].toString().isNotEmpty
-                                        ? Image.file(
-                                            File(issue['image']),
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) =>
-                                                const Icon(Icons.broken_image),
-                                          )
-                                        : const Icon(Icons.broken_image),
-                                    if (selected)
-                                      Container(
-                                        color: Colors.black45,
-                                        child: const Icon(Icons.check,
-                                            color: Colors.white, size: 40),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              issue['title'],
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-
-            const SizedBox(height: 24),
-            // Form fields
-            _buildTextField(controller: nameController, label: 'Name'),
-            _buildTextField(controller: teamController, label: 'Team'),
-            _buildTextField(controller: emailController, label: 'Email'),
-            _buildTextField(controller: costumeNumberController, label: 'Costume Number(s)'),
-            _buildTextField(controller: commentController, label: 'Comments'),
-            const SizedBox(height: 16),
-            GestureDetector(
-              onTap: pickImage,
-              child: Card(
+                saveRepairData();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: myColors.primary,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: SizedBox(
-                  height: 200,
-                  width: double.infinity,
-                  child: Center(
-                    child: photo != null
-                        ? Image.file(photo!,
-                            fit: BoxFit.cover, width: double.infinity)
-                        : const Text('Tap to take a picture'),
-                  ),
-                ),
+              ),
+              child: const Text(
+                'Submit Repair',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
-            const SizedBox(height: 20),
-            Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  if (nameController.text.trim().isEmpty ||
-                      teamController.text.trim().isEmpty ||
-                      emailController.text.trim().isEmpty ||
-                      costumeNumberController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Please fill out all required fields (Name, Team, Email, Costume #)."),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    return;
-                  }
-
-                  saveRepairData();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: myColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text(
-                  'Submit Repair',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ]),
       ),
     );
   }
