@@ -27,9 +27,8 @@ class _IssueMenuPageState extends State<IssueMenuPage> {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) return null;
 
-      final storageRef = FirebaseStorage.instance.ref(
-        'admins/${currentUser.uid}/issues/${uuid.v4()}.jpg',
-      );
+      final storageRef = FirebaseStorage.instance
+          .ref('admins/${currentUser.uid}/issues/${uuid.v4()}.jpg');
 
       final snapshot = await storageRef.putFile(file);
       final downloadUrl = await snapshot.ref.getDownloadURL();
@@ -44,21 +43,24 @@ class _IssueMenuPageState extends State<IssueMenuPage> {
     final provider = context.read<IssuesProvider>();
     final picker = ImagePicker();
 
-    // Choose source
+    // Select image source
     final source = await showDialog<ImageSource>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text("Select Image Source"),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, ImageSource.camera),
-              child: const Text("Camera")),
+            onPressed: () => Navigator.pop(context, ImageSource.camera),
+            child: const Text("Camera"),
+          ),
           TextButton(
-              onPressed: () => Navigator.pop(context, ImageSource.gallery),
-              child: const Text("Gallery")),
+            onPressed: () => Navigator.pop(context, ImageSource.gallery),
+            child: const Text("Gallery"),
+          ),
         ],
       ),
     );
+
     if (source == null) return;
 
     // Pick image
@@ -73,20 +75,20 @@ class _IssueMenuPageState extends State<IssueMenuPage> {
         content: TextField(controller: _titleController),
         actions: [
           TextButton(
-            onPressed: () =>
-                Navigator.pop(context, _titleController.text.trim()),
+            onPressed: () => Navigator.pop(context, _titleController.text.trim()),
             child: const Text("OK"),
           ),
         ],
       ),
     );
+
     if (title == null || title.isEmpty) return;
 
     // Upload image
     final uploadedUrl = await _uploadImage(File(picked.path));
     if (uploadedUrl == null) return;
 
-    // Create issue with URL
+    // Create issue
     final newIssue = Issues(
       id: uuid.v4(),
       title: title,

@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:raw_threads/classes/main_classes/issues.dart';
 import 'package:provider/provider.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
@@ -13,6 +12,7 @@ import 'package:raw_threads/pages/repair_builds/repair_summary_page.dart';
 import 'package:uuid/uuid.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:raw_threads/services/storage_service.dart';
 
 final uuid = Uuid();
 
@@ -40,7 +40,6 @@ class RepairDetailsPage extends StatefulWidget {
 
 class _RepairDetailsPageState extends State<RepairDetailsPage> {
   List<Map<String, dynamic>> issueOptions = [];
-  File? photo;
   String? _uploadedPhotoUrl;
 
   final TextEditingController nameController = TextEditingController();
@@ -102,54 +101,35 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
     });
   }
 
-  Future<String?> _uploadRepairPhoto(File file) async {
-    try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) return null;
-
-      final storageRef = FirebaseStorage.instance.ref(
-        'admins/${currentUser.uid}/repairs/${uuid.v4()}.jpg',
-      );
-
-      final snapshot = await storageRef.putFile(file);
-      final downloadUrl = await snapshot.ref.getDownloadURL();
-      return downloadUrl;
-    } catch (e) {
-      debugPrint("Repair photo upload failed: $e");
-      return null;
-    }
-  }
-
   Future<void> pickImage() async {
-    final picker = ImagePicker();
-    final source = await showDialog<ImageSource>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Select Image Source"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, ImageSource.camera),
-            child: const Text("Camera"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, ImageSource.gallery),
-            child: const Text("Gallery"),
-          ),
-        ],
-      ),
+    if (FirebaseAuth.instance.currentUser == null) return;
+
+    final currentUser = FirebaseAuth.instance.currentUser!;
+
+    final uploadedUrl = await StorageHelper.pickUploadAndReturnUrl(
+      storagePath:
+          'admins/${currentUser.uid}/repairs/${uuid.v4()}', // unique storage path
+      fromCamera: await showDialog<bool>(
+            context: context,
+            builder: (_) => AlertDialog(
+              title: const Text("Select Image Source"),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text("Camera"),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text("Gallery"),
+                ),
+              ],
+            ),
+          ) ??
+          false,
     );
-
-    if (source == null) return;
-
-    final picked = await picker.pickImage(source: source);
-    if (picked == null) return;
-
-    final file = File(picked.path);
-    final uploadedUrl = await _uploadRepairPhoto(file);
 
     if (uploadedUrl != null) {
       setState(() {
-        photo = file;
         _uploadedPhotoUrl = uploadedUrl;
       });
     }
@@ -163,7 +143,7 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
         .map((i) => Issues(
               id: i['id'] ?? uuid.v4(),
               title: i['title'],
-              image: i['image'], // Use URL from issue menu
+              image: i['image'],
             ))
         .toList();
 
@@ -201,10 +181,11 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
     }
   }
 
-  Widget _buildTextField(
-      {required TextEditingController controller,
-      required String label,
-      int maxLines = 1}) {
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    int maxLines = 1,
+  }) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 2,
@@ -214,7 +195,8 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
         child: TextField(
           controller: controller,
           maxLines: maxLines,
-          decoration: InputDecoration(labelText: label, border: InputBorder.none),
+          decoration:
+              InputDecoration(labelText: label, border: InputBorder.none),
         ),
       ),
     );
@@ -286,11 +268,12 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: issueOptions.length,
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 150,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 0.8),
+                  gridDelegate:
+                      const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 150,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 0.8),
                   itemBuilder: (_, index) {
                     final issue = issueOptions[index];
                     final selected = issue['selected'] == true;
@@ -366,11 +349,9 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
                 height: 200,
                 width: double.infinity,
                 child: Center(
-                  child: photo != null
-                      ? Image.file(photo!, fit: BoxFit.cover, width: double.infinity)
-                      : _uploadedPhotoUrl != null
-                          ? Image.network(_uploadedPhotoUrl!, fit: BoxFit.cover)
-                          : const Text('Tap to take a picture'),
+                  child: _uploadedPhotoUrl != null
+                      ? Image.network(_uploadedPhotoUrl!, fit: BoxFit.cover)
+                      : const Text('Tap to take a picture'),
                 ),
               ),
             ),
@@ -392,7 +373,6 @@ class _RepairDetailsPageState extends State<RepairDetailsPage> {
                   );
                   return;
                 }
-
                 saveRepairData();
               },
               style: ElevatedButton.styleFrom(

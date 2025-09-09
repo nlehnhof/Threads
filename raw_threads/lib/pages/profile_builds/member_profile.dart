@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:raw_threads/classes/main_classes/app_user.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'dart:io';
 
 class MemberProfile extends StatelessWidget {
   final String userId;
@@ -30,8 +29,7 @@ class MemberProfile extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (!snapshot.hasData ||
-              snapshot.data!.snapshot.value == null) {
+          if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
             return const Center(child: Text("User not found."));
           }
 
@@ -47,9 +45,7 @@ class MemberProfile extends StatelessWidget {
                 CircleAvatar(
                   radius: 50,
                   backgroundImage: user.photoURL != null
-                      ? (user.photoURL!.startsWith('http')
-                          ? NetworkImage(user.photoURL!)
-                          : FileImage(File(user.photoURL!)) as ImageProvider)
+                      ? NetworkImage(user.photoURL!)
                       : null,
                   child: user.photoURL == null
                       ? const Icon(Icons.person, size: 50)

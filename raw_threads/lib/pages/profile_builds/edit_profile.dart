@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:raw_threads/classes/main_classes/app_user.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -53,10 +52,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> pickImage() async {
-    // Pick and upload using StorageHelper
-    final userId = currentUser!.uid; // example: store under "users/$uid"
-    final uploadedUrl = await StorageHelper.pickAndUploadImage(
-      storagePath: 'users/$userId/',
+    final userId = currentUser!.uid; // or adminId/danceId path
+    final storagePath = 'users/$userId/profile_photos'; // storage folder
+    final dbPath = 'users/$userId/profile_photos';      // database path
+
+    // Pick, upload, and save URL to database
+    final uploadedUrl = await StorageHelper.pickUploadAndReturnUrl(
+      storagePath: storagePath,
       fromCamera: false,
     );
 
@@ -66,12 +68,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _photo = null; // we now use URL instead of local file
       });
 
-      // Save locally too if needed
+      // Save locally if you want persistent offline reference
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('profile_photo_path', uploadedUrl);
+    } else {
+      print('Image upload failed or was canceled.');
     }
   }
-
 
   void _addSize() {
     setState(() {

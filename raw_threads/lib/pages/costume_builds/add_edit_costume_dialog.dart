@@ -1,6 +1,4 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:raw_threads/classes/main_classes/costume_piece.dart';
 import 'package:uuid/uuid.dart';
 import 'package:raw_threads/services/storage_service.dart';
@@ -29,12 +27,10 @@ class AddEditCostumeDialog extends StatefulWidget {
 }
 
 class _AddEditCostumeDialogState extends State<AddEditCostumeDialog> {
-  final ImagePicker _picker = ImagePicker();
   final uuid = Uuid();
   final currentUser = FirebaseAuth.instance.currentUser;
 
-  File? _pickedImageFile;
-  String? _imageUrl; // URL in Firebase Storage
+  String? _imageUrl; // Firebase Storage URL
 
   late TextEditingController _titleController;
   late TextEditingController _careController;
@@ -42,17 +38,19 @@ class _AddEditCostumeDialogState extends State<AddEditCostumeDialog> {
   late TextEditingController _availableController;
   late TextEditingController _totalController;
 
+  bool _isUploading = false;
+
   @override
   void initState() {
     super.initState();
     final existing = widget.existing;
-    _imageUrl = existing?.imagePath; // assume existing path is URL if previously uploaded
+    _imageUrl = existing?.imagePath; // assume existing path is already a Firebase URL
 
     _titleController = TextEditingController(text: existing?.title ?? '');
     _careController = TextEditingController(text: existing?.care ?? '');
     _turnInController = TextEditingController(text: existing?.turnIn ?? '');
-    _availableController = TextEditingController(text: existing?.available.toString());
-    _totalController = TextEditingController(text: existing?.total.toString());
+    _availableController = TextEditingController(text: existing?.available.toString() ?? '');
+    _totalController = TextEditingController(text: existing?.total.toString() ?? '');
   }
 
   @override
@@ -65,21 +63,40 @@ class _AddEditCostumeDialogState extends State<AddEditCostumeDialog> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
-    if (currentUser == null) return;
+Future<void> _pickImage() async {
+  if (currentUser == null) return;
 
-    final uploadedUrl = await StorageHelper.pickAndUploadImage(
-      storagePath: 'admins/${currentUser!.uid}/dances/${widget.danceId}/costumes/${widget.gender}/',
-      fromCamera: false,
+  // Pick file
+  final pickedFile = await StorageHelper.pickFile(fromCamera: false);
+  if (pickedFile == null) return;
+
+  setState(() => _isUploading = true);
+
+  // Build storage path for this costume piece
+  final storagePath =
+      'admins/${currentUser!.uid}/dances/${widget.danceId}/costumes/${widget.gender}/${widget.existing?.id ?? uuid.v4()}';
+
+  try {
+    final uploadedUrl = await StorageHelper.uploadFile(
+      file: pickedFile,
+      storagePath: storagePath,
     );
 
     if (uploadedUrl != null) {
-      setState(() {
-        _imageUrl = uploadedUrl;
-        _pickedImageFile = null; // we now use URL instead of local file
-      });
+      setState(() => _imageUrl = uploadedUrl);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Image upload failed')),
+      );
     }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Upload error: $e')),
+    );
+  } finally {
+    setState(() => _isUploading = false);
   }
+}
 
   void _onSavePressed() {
     final title = _titleController.text.trim();
@@ -89,16 +106,14 @@ class _AddEditCostumeDialogState extends State<AddEditCostumeDialog> {
     final total = int.tryParse(_totalController.text.trim()) ?? 0;
 
     if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Title cannot be empty')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Title cannot be empty')));
       return;
     }
 
     if (_imageUrl == null || _imageUrl!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an image')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Please select an image')));
       return;
     }
 
@@ -109,30 +124,36 @@ class _AddEditCostumeDialogState extends State<AddEditCostumeDialog> {
       turnIn: turnIn,
       available: available,
       total: total,
-      imagePath: _imageUrl, // now storing URL
+      imagePath: _imageUrl, // now storing Firebase URL
     );
 
     widget.onSave(newPiece);
+    Navigator.pop(context);
   }
 
-  Widget _buildImageWidget() {
-    if (_pickedImageFile != null) {
-      return Image.file(_pickedImageFile!, height: 150, fit: BoxFit.cover);
-    } else if (_imageUrl != null && _imageUrl!.isNotEmpty) {
-      return Image.network(_imageUrl!, height: 150, fit: BoxFit.cover);
-    }
-    return _placeholderImage();
-  }
-
-  Widget _placeholderImage() {
+Widget _buildImageWidget() {
+  if (_isUploading) {
     return Container(
       height: 150,
       color: Colors.grey[300],
-      child: const Center(
-        child: Icon(Icons.image, size: 50, color: Colors.grey),
-      ),
+      child: const Center(child: CircularProgressIndicator()),
     );
+  } else if (_imageUrl != null && _imageUrl!.isNotEmpty) {
+    return Image.network(_imageUrl!, height: 150, fit: BoxFit.cover);
+  } else {
+    return _placeholderImage();
   }
+}
+
+Widget _placeholderImage() {
+  return Container(
+    height: 150,
+    color: Colors.grey[300],
+    child: const Center(
+      child: Icon(Icons.image, size: 50, color: Colors.grey),
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {

@@ -72,122 +72,145 @@ class _CostumePageState extends State<CostumePage> {
     }
   }
 
-  Future<void> _viewCostume(CostumePiece piece) async {
-    Widget imageWidget;
-    if (piece.imagePath != null && piece.imagePath!.isNotEmpty) {
-      final file = File(piece.imagePath!);
-      if (file.existsSync()) {
-        imageWidget = Image.file(file, height: 150, fit: BoxFit.cover);
-      } else {
-        imageWidget = _placeholderImage();
-      }
-    } else {
-      imageWidget = _placeholderImage();
-    }
+Future<void> _viewCostume(CostumePiece piece) async {
+  Widget imageWidget;
 
-    await showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(piece.title),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  if (piece.imagePath != null && piece.imagePath!.isNotEmpty) {
+    if (piece.imagePath!.startsWith('http')) {
+      imageWidget = Image.network(
+        piece.imagePath!,
+        height: 150,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return const Center(child: CircularProgressIndicator());
+        },
+        errorBuilder: (_, __, ___) => _placeholderImage(),
+      );
+    } else {
+      final file = File(piece.imagePath!);
+      imageWidget = file.existsSync()
+          ? Image.file(file, height: 150, fit: BoxFit.cover)
+          : _placeholderImage();
+    }
+  } else {
+    imageWidget = _placeholderImage();
+  }
+
+  await showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: Text(piece.title),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            imageWidget,
+            const SizedBox(height: 10),
+            Text("Care: ${piece.care}"),
+            const SizedBox(height: 10),
+            Text("Turn In: ${piece.turnIn}"),
+            const SizedBox(height: 10),
+            Text("Available: ${piece.available}"),
+            Text("Total: ${piece.total}"),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Close"),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildCostumeCard(CostumePiece piece, int index) {
+  Widget imageWidget;
+
+  if (piece.imagePath != null && piece.imagePath!.isNotEmpty) {
+    if (piece.imagePath!.startsWith('http')) {
+      // Firebase Storage URL
+      imageWidget = Image.network(
+        piece.imagePath!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: 150,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return const Center(child: CircularProgressIndicator());
+        },
+        errorBuilder: (_, __, ___) => _placeholderImage(),
+      );
+    } else {
+      // fallback to local file
+      final file = File(piece.imagePath!);
+      imageWidget = file.existsSync()
+          ? Image.file(file, fit: BoxFit.cover, width: double.infinity, height: 150)
+          : _placeholderImage();
+    }
+  } else {
+    imageWidget = _placeholderImage();
+  }
+
+  return GestureDetector(
+    onTap: () {
+      final assignmentProvider = context.read<AssignmentProvider>();
+
+      assignmentProvider.setContext(
+        danceId: widget.dance.id,
+        gender: widget.gender,
+        costumeId: piece.id,
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AssignPage(costume: piece, role: widget.role),
+        ),
+      );
+    },
+    onLongPress: () {
+      if (isAdmin) {
+        _addOrEditCostume(existing: piece);
+      } else {
+        _viewCostume(piece);
+      }
+    },
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          clipBehavior: Clip.antiAlias,
+          child: SizedBox(height: 150, width: double.infinity, child: imageWidget),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+          child: Row(
             children: [
-              imageWidget,
-              const SizedBox(height: 10),
-              Text("Care: ${piece.care}"),
-              const SizedBox(height: 10),
-              Text("Turn In: ${piece.turnIn}"),
-              const SizedBox(height: 10),
-              Text("Available: ${piece.available}"),
-              Text("Total: ${piece.total}"),
+              Expanded(
+                child: Text(
+                  piece.title,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.left,
+                ),
+              ),
+              Text(
+                "${piece.available}/${piece.total}",
+                style: const TextStyle(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.right,
+              ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Close"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCostumeCard(CostumePiece piece, int index) {
-    Widget imageWidget;
-    if (piece.imagePath != null && piece.imagePath!.isNotEmpty) {
-      final file = File(piece.imagePath!);
-      if (file.existsSync()) {
-        imageWidget = Image.file(file, fit: BoxFit.cover, width: double.infinity, height: 150);
-      } else {
-        imageWidget = _placeholderImage();
-      }
-    } else {
-      imageWidget = _placeholderImage();
-    }
-
-    return GestureDetector(
-      onTap: () {
-        final assignmentProvider = context.read<AssignmentProvider>();
-
-        // Set current dance/gender/costume context inside AssignmentProvider
-        assignmentProvider.setContext(
-          danceId: widget.dance.id,
-          gender: widget.gender,
-          costumeId: piece.id,
-        );
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AssignPage(
-              costume: piece,
-              role: widget.role,
-            ),
-          ),
-        );
-      },
-      onLongPress: () {
-        if (isAdmin) {
-          _addOrEditCostume(existing: piece);
-        } else {
-          _viewCostume(piece);
-        }
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            clipBehavior: Clip.antiAlias,
-            child: SizedBox(height: 150, width: double.infinity, child: imageWidget),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    piece.title,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.left,
-                  ),
-                ),
-                Text(
-                  "${piece.available}/${piece.total}",
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.right,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
+}
 
   Widget _placeholderImage() {
     return Container(
