@@ -1,20 +1,20 @@
-import 'package:raw_threads/classes/main_classes/dances.dart' as mydance;
+import 'package:raw_threads/classes/main_classes/dances.dart';
 
-class DanceWithStatus {
-  final mydance.Dances dance;
+class DanceStatus {
+  final Dances dance;
   String status;
 
-  DanceWithStatus({required this.dance, this.status = 'Not Ready'});
+  DanceStatus({required this.dance, this.status = 'Not Ready'});
 
-  Map<String, dynamic> toJson() => {
-    'dance': dance.toJson(),
-    'status': status,
-  };
-
-  factory DanceWithStatus.fromJson(Map<String, dynamic> json) {
-    return DanceWithStatus(
-      dance: mydance.Dances.fromJson(json['dance']),
-      status: json['status'],
+  factory DanceStatus.fromJson(Map<dynamic, dynamic> json, Dances dance) {
+    return DanceStatus(
+      dance: dance,
+      status: json['status']?.toString() ?? 'Not Ready',
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'danceId': dance.id,
+        'status': status,
+      };
 }

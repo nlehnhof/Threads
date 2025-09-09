@@ -1,104 +1,130 @@
-import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:raw_threads/classes/main_classes/shows.dart';
+import '../classes/main_classes/shows.dart';
+import 'dance_inventory_provider.dart';
+import '../pages/show_builds/dance_with_status.dart';
 
 class ShowsProvider extends ChangeNotifier {
   final String adminId;
+  final DatabaseReference db = FirebaseDatabase.instance.ref();
+
+  ShowsProvider({required this.adminId});
+
   final List<Shows> _shows = [];
   List<Shows> get shows => List.unmodifiable(_shows);
 
-  StreamSubscription<DatabaseEvent>? _showsSubscription;
+  // showId -> danceId -> DanceStatus
+  final Map<String, Map<String, DanceStatus>> _danceStatuses = {};
+  Map<String, DanceStatus> getDanceStatuses(String showId) =>
+      _danceStatuses[showId] ?? {};
 
-  ShowsProvider({
-    required this.adminId,
-  });
-
-  // Initialize and start listening for changes for the given adminId
-  Future<void> init() async {
-    // Cancel existing subscription if any
-    await _showsSubscription?.cancel();
-
-    await load();
-
-    // Load initial shows from Firebase once
-    _showsSubscription = FirebaseDatabase.instance
-        .ref('admins/$adminId/shows')
-        .onValue
-        .listen((event) {
-          final showsMap = event.snapshot.value as Map<dynamic, dynamic>?;
-        
-          if (showsMap != null) {
-            _shows.clear();
-            _shows.addAll(showsMap.entries
-            .map((e) => Shows.fromJson(Map<String, dynamic>.from(e.value))));
-          } else {
-            _shows.clear();
-          }
-          notifyListeners();
-        });
-  }
-  
-  Future<void> load() async {
-
-    final snapshot = await FirebaseDatabase.instance
-        .ref('admins/$adminId/shows')
-        .get();
-
+  Future<void> init(DanceInventoryProvider danceProvider) async {
+    try {
+    final snapshot = await db.child('admins/$adminId/shows').get();
     if (snapshot.exists) {
-      final showsMap = Map<String, dynamic>.from(snapshot.value as Map);
-      _shows.clear();
-      _shows.addAll(showsMap.entries
-          .map((e) => Shows.fromJson(Map<String, dynamic>.from(e.value))));
-    } else {
-      _shows.clear();
+      final rawData = snapshot.value as Map<dynamic, dynamic>;
+      
+      // Convert dynamic keys to String
+      final data = rawData.map((key, value) => MapEntry(key.toString(), value));
+
+      data.forEach((showId, showData) {
+        final showJson = Map<String, dynamic>.from(showData as Map);
+        final show = Shows.fromJson(showJson);
+        _shows.add(show);
+
+        // handle danceStatuses similarly
+        final danceStatusMap = <String, DanceStatus>{};
+        final rawStatuses = showJson['danceStatuses'];
+        if (rawStatuses is Map) {
+          rawStatuses.forEach((danceId, value) {
+            final danceJson = value as Map;
+            danceStatusMap[danceId.toString()] = DanceStatus(
+              dance: danceProvider.getDanceById(danceId.toString())!,
+              status: danceJson['status']?.toString() ?? 'Not Ready',
+            );
+          });
+        }
+
+        _danceStatuses[show.id] = danceStatusMap;
+      });
+
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error initializing ShowsProvider: $e');
     }
-    notifyListeners();
   }
 
+  // Add a new show
   Future<void> addShow(Shows show) async {
-    // Avoid duplicate IDs
-    if (_shows.any((s) => s.id == show.id)) return;
-
-    _shows.add(show);
-    notifyListeners();
-
-    await FirebaseDatabase.instance
-        .ref('admins/$adminId/shows/${show.id}')
-        .set(show.toJson());
-  }
-
-  Future<void> updateShow(Shows updatedShow) async {
-    final index = _shows.indexWhere((s) => s.id == updatedShow.id);
-    if (index != -1) {
-      _shows[index] = updatedShow;
+    try {
+      await db.child('admins/$adminId/shows/${show.id}').set(show.toJson());
+      _shows.add(show);
+      _danceStatuses[show.id] = {};
       notifyListeners();
-
-      await FirebaseDatabase.instance
-          .ref('admins/$adminId/shows/${updatedShow.id}')
-          .set(updatedShow.toJson());
+    } catch (e) {
+      debugPrint('Failed to add show: $e');
     }
   }
 
-  Future<void> removeShow(String showId) async {
-    
-    Shows? removed = _shows.cast<Shows?>().firstWhere(
-      (s) => s?.id == showId,
-      orElse: () => null,
-    );
-    if (removed == null) return;
+  // Update existing show (does not overwrite dance statuses)
+  Future<void> updateShow(Shows updatedShow) async {
+    try {
+      await db
+          .child('admins/$adminId/shows/${updatedShow.id}')
+          .update(updatedShow.toJson());
 
-    _shows.removeWhere((s) => s.id == showId);
-    notifyListeners();
-
-    await FirebaseDatabase.instance
-        .ref('admins/$adminId/shows/$showId')
-        .remove();
+      final index = _shows.indexWhere((s) => s.id == updatedShow.id);
+      if (index != -1) _shows[index] = updatedShow;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Failed to update show: $e');
+    }
   }
 
-  @override
-  void dispose() {
-    _showsSubscription?.cancel();
-    super.dispose();
+  // Remove a show
+  Future<void> removeShow(String showId) async {
+    try {
+      await db.child('admins/$adminId/shows/$showId').remove();
+      _shows.removeWhere((s) => s.id == showId);
+      _danceStatuses.remove(showId);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Failed to remove show: $e');
+    }
+  }
+
+  // Update a single dance status
+  Future<void> updateDanceStatus(
+      String showId, String danceId, String status) async {
+    try {
+      await db
+          .child('admins/$adminId/shows/$showId/danceStatuses/$danceId')
+          .update({'status': status});
+
+      _danceStatuses[showId] ??= {};
+      _danceStatuses[showId]![danceId]?.status = status;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Failed to update dance status: $e');
+    }
+  }
+
+  // Bulk update dance statuses
+  Future<void> updateDanceStatuses(
+      String showId, Map<String, String> statuses) async {
+    try {
+      final updates = {for (var e in statuses.entries) e.key: {'status': e.value}};
+      await db.child('admins/$adminId/shows/$showId/danceStatuses').update(updates);
+
+      _danceStatuses[showId] ??= {};
+      statuses.forEach((danceId, status) {
+        _danceStatuses[showId]![danceId]?.status = status;
+      });
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Failed to update dance statuses: $e');
+    }
   }
 }

@@ -18,7 +18,7 @@ class Dances {
     this.rightImagePath,
     this.costumesMen = const [],
     this.costumesWomen = const [],
-    this.ownerUsername, // new optional field for ownership
+    this.status, // new optional field for ownership
   });
 
   final String id;
@@ -32,7 +32,7 @@ class Dances {
   final String? rightImagePath;
   List<CostumePiece> costumesMen;
   List<CostumePiece> costumesWomen;
-  final String? ownerUsername; // added ownerUsername
+  final String? status; // added status
 
   Dances copyWith({
     String? id,
@@ -46,7 +46,7 @@ class Dances {
     String? rightImagePath,
     List<CostumePiece>? costumesMen,
     List<CostumePiece>? costumesWomen,
-    String? ownerUsername, // allow copying ownerUsername
+    String? status, // allow copying status
   }) {
     return Dances(
       id: id ?? this.id,
@@ -61,11 +61,11 @@ class Dances {
       // other fields...
       costumesMen: costumesMen ?? List.from(this.costumesMen),
       costumesWomen: costumesWomen ?? List.from(this.costumesWomen),  
-      ownerUsername: ownerUsername ?? this.ownerUsername,
+      status: status ?? this.status,
     );
   }
 
-  // Convert to Map including costumes and ownerUsername
+  // Convert to Map including costumes and status
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -79,11 +79,11 @@ class Dances {
       'rightImagePath': rightImagePath,
       'costumesMen': costumesMen.map((c) => c.toJson()).toList(),
       'costumesWomen': costumesWomen.map((c) => c.toJson()).toList(),
-      'ownerUsername': ownerUsername,
+      'status': status,
     };
   }
 
-  // Create from Map including costumes and ownerUsername
+  // Create from Map including costumes and status
   factory Dances.fromJson(Map<String, dynamic> json) {
     return Dances(
       id: json['id'],
@@ -106,7 +106,7 @@ class Dances {
               ?.map((c) => CostumePiece.fromJson(c))
               .toList() ??
           [],
-      ownerUsername: json['ownerUsername'], // read ownerUsername from json
+      status: json['status'], // read status from json
     );
   }
 

@@ -1,19 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:provider/provider.dart';
+
 import 'package:raw_threads/classes/main_classes/shows.dart';
 import 'package:raw_threads/classes/main_classes/dances.dart';
-// import 'package:raw_threads/classes/main_classes/teams.dart'; 
 import 'package:raw_threads/pages/show_builds/dance_selection_page.dart';
-import 'package:firebase_database/firebase_database.dart';
-
-import 'package:provider/provider.dart';
+import 'package:raw_threads/pages/show_builds/dance_with_status.dart';
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
-import 'package:raw_threads/providers/teams_provider.dart';
-
-class DanceStatusAndTeams {
-  String status;
-  Set<String> teams;
-  DanceStatusAndTeams({required this.status, required this.teams});
-}
 
 class EditShowPage extends StatefulWidget {
   final Shows show;
@@ -26,9 +19,6 @@ class EditShowPage extends StatefulWidget {
 }
 
 class _EditShowPageState extends State<EditShowPage> {
-  late DanceInventoryProvider provider;
-  late TeamProvider teamProvider;
-
   late List<String> _selectedDanceIds;
   late TextEditingController _titleController;
   late TextEditingController _locationController;
@@ -36,7 +26,7 @@ class _EditShowPageState extends State<EditShowPage> {
   late TextEditingController _techController;
   late TextEditingController _dressController;
 
-  final Map<String, DanceStatusAndTeams> danceStatusMap = {};
+  final Map<String, DanceStatus> danceStatusMap = {};
 
   @override
   void initState() {
@@ -47,11 +37,6 @@ class _EditShowPageState extends State<EditShowPage> {
     _datesController = TextEditingController(text: widget.show.dates);
     _techController = TextEditingController(text: widget.show.tech);
     _dressController = TextEditingController(text: widget.show.dress);
-    
-    // Initialize all dances in the map with default if missing
-    for (var id in _selectedDanceIds) {
-      danceStatusMap[id] = DanceStatusAndTeams(status: 'Not Ready', teams: {});
-    }
 
     _loadDanceStatuses();
   }
@@ -78,39 +63,58 @@ class _EditShowPageState extends State<EditShowPage> {
 
     if (result != null) {
       setState(() {
+        // Add new dances
+        final danceProvider = context.read<DanceInventoryProvider>();
         for (var id in result) {
-          danceStatusMap.putIfAbsent(id, () => DanceStatusAndTeams(status: 'Not Ready', teams: {}));
+          if (!danceStatusMap.containsKey(id)) {
+            final dance = danceProvider.getDanceById(id);
+            if (dance != null) {
+              danceStatusMap[id] = DanceStatus(dance: dance);
+            }
+          }
         }
+        // Remove deselected dances
         danceStatusMap.removeWhere((id, _) => !result.contains(id));
         _selectedDanceIds = result;
       });
     }
   }
 
-  void _loadDanceStatuses() async {
+  Future<void> _loadDanceStatuses() async {
     final db = FirebaseDatabase.instance.ref();
-    final danceStatusesRef = db.child('shows/${widget.show.adminId}/${widget.show.id}/danceStatuses');
+    final ref = db.child('admins/${widget.show.adminId}/shows/${widget.show.id}/danceStatuses');
+    final snapshot = await ref.get();
 
-    final snapshot = await danceStatusesRef.get();
-    final statusMap = <String, DanceStatusAndTeams>{};
+    final loadedStatuses = <String, DanceStatus>{};
+    final danceProvider = context.read<DanceInventoryProvider>();
 
     if (snapshot.exists) {
-      final data = Map<String, dynamic>.from(snapshot.value as Map);
-      for (final entry in data.entries) {
-        final danceId = entry.key;
-        final value = Map<String, dynamic>.from(entry.value);
-        statusMap[danceId] = DanceStatusAndTeams(
-          status: value['status'] ?? 'Not Ready',
-          teams: Set<String>.from(List<String>.from(value['teams'] ?? [])),
-        );
+      final data = Map<dynamic, dynamic>.from(snapshot.value as Map);
+      data.forEach((danceId, value) {
+        final dance = danceProvider.getDanceById(danceId.toString());
+        if (dance != null) {
+          loadedStatuses[dance.id] = DanceStatus.fromJson(
+            Map<dynamic, dynamic>.from(value),
+            dance,
+          );
+        }
+      });
+    }
+
+    // Ensure all selected dances exist
+    for (var id in _selectedDanceIds) {
+      if (!loadedStatuses.containsKey(id)) {
+        final dance = danceProvider.getDanceById(id);
+        if (dance != null) {
+          loadedStatuses[id] = DanceStatus(dance: dance);
+        }
       }
     }
 
     setState(() {
-      danceStatusMap.addAll(statusMap);
-      for (var id in _selectedDanceIds) {
-        danceStatusMap.putIfAbsent(id, () => DanceStatusAndTeams(status: 'Not Ready', teams: {}));
-      }
+      danceStatusMap
+        ..clear()
+        ..addAll(loadedStatuses);
     });
   }
 
@@ -128,63 +132,35 @@ class _EditShowPageState extends State<EditShowPage> {
     );
 
     final db = FirebaseDatabase.instance.ref();
-    final showRef = db.child('shows/${updatedShow.adminId}/${updatedShow.id}');
+    final showRef = db.child('admins/${updatedShow.adminId}/shows/${updatedShow.id}');
 
-    // Save main show info
-    await showRef.set(updatedShow.toJson());
+    try {
+      // Save main show info
+      await showRef.update(updatedShow.toJson());
 
-    // Save dance status/teams under 'danceStatuses' child node
-    for (var entry in danceStatusMap.entries) {
-      await showRef
-          .child('danceStatuses/${entry.key}')
-          .set({
-            'status': entry.value.status,
-            'teams': entry.value.teams.toList(),
-          });
+      // Save all dance statuses in bulk
+      final updates = <String, dynamic>{};
+      danceStatusMap.forEach((id, ds) {
+        updates[id] = {'status': ds.status};
+      });
+      await showRef.child('danceStatuses').update(updates);
+
+      widget.onSave(updatedShow);
+      Navigator.of(ctx).pop(updatedShow);
+    } catch (e) {
+      debugPrint('Failed to save show: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to save show')),
+      );
     }
-
-    widget.onSave(updatedShow);
-    Navigator.of(ctx).pop(updatedShow);
   }
-
-  // Future<void> _syncDanceAssignmentsWithTeams() async {
-  //   final teamProvider = Provider.of<TeamProvider>(context, listen: false);
-
-  //   // Map teamId -> set of danceIds assigned
-  //   final Map<String, Set<String>> teamToDanceIds = {
-  //     for (var team in teamProvider.teams) team.id: <String>{}
-  //   };
-
-  //   // Build assignments from danceStatusMap
-  //   for (var entry in danceStatusMap.entries) {
-  //     final danceId = entry.key;
-  //     final assignedTeamNames = entry.value.teams;
-
-  //     for (var teamName in assignedTeamNames) {
-  //       final team = teamProvider.teams.firstWhere(
-  //         (t) => t.title == teamName,
-  //         orElse: () => Teams(id: '', title: '', members: [], assigned: []),
-  //       );
-  //       if (team.id == '') continue; // Skip if no matching team found
-  //       teamToDanceIds[team.id]?.add(danceId);
-  //     }
-  //   }
-
-  //   await teamProvider.updateDanceAssignments(teamToDanceIds);
-  // }
 
   @override
   Widget build(BuildContext context) {
-    provider = context.watch<DanceInventoryProvider>();
-    teamProvider = context.watch<TeamProvider>();
-
     final selectedDances = _selectedDanceIds
-        .map((id) => provider.getDanceById(id))
+        .map((id) => danceStatusMap[id]?.dance)
         .whereType<Dances>()
         .toList();
-
-    // Use teamProvider.teams titles for multi-select options
-    // final allTeamNames = teamProvider.teams.map((t) => t.title).toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Show')),
@@ -214,51 +190,51 @@ class _EditShowPageState extends State<EditShowPage> {
                 itemCount: selectedDances.length,
                 itemBuilder: (ctx, index) {
                   final dance = selectedDances[index];
-                  final statusTeams = danceStatusMap[dance.id]!;
+                  final danceStatus = danceStatusMap[dance.id]!;
 
                   return Card(
                     margin: const EdgeInsets.symmetric(vertical: 6),
                     child: Padding(
                       padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(dance.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              const Text("Status: "),
-                              DropdownButton<String>(
-                                value: statusTeams.status,
-                                items: ['Prepped', 'Distributed', 'Not Ready']
-                                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                                    .toList(),
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    setState(() => statusTeams.status = val);
-                                  }
-                                },
-                              ),
-                              const SizedBox(width: 16),
-                              // Expanded(
-                              //   child: TeamsMultiSelect(
-                              //     allTeams: allTeamNames,
-                              //     selectedTeams: statusTeams.teams,
-                              //     onChanged: (teams) {
-                              //       setState(() => statusTeams.teams = teams);
-                              //     },
-                              //   ),
-                              // ),
-                              IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.redAccent),
-                                onPressed: () {
-                                  setState(() {
-                                    _selectedDanceIds.remove(dance.id);
-                                    danceStatusMap.remove(dance.id);
-                                  });
-                                },
-                              ),
-                            ],
+                          DropdownButton<String>(
+                            value: danceStatus.status,
+                            items: ['Prepped', 'Distributed', 'Not Ready']
+                                .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                                .toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() => danceStatus.status = val);
+                              }
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.redAccent),
+                            onPressed: () async {
+                              final danceId = dance.id;
+
+                              setState(() {
+                                _selectedDanceIds.remove(danceId);
+                                danceStatusMap.remove(danceId);
+                              });
+
+                              final db = FirebaseDatabase.instance.ref();
+                              final showRef = db.child('admins/${widget.show.adminId}/shows/${widget.show.id}');
+
+                              // Remove danceStatus entry
+                              await showRef.child('danceStatuses/$danceId').remove();
+
+                              // Remove danceId from the show's danceIds array
+                              final snapshot = await showRef.child('danceIds').get();
+                              if (snapshot.exists) {
+                                final List<dynamic> danceIds = List<dynamic>.from(snapshot.value as List);
+                                danceIds.remove(danceId);
+                                await showRef.child('danceIds').set(danceIds);
+                              }
+                            },
                           ),
                         ],
                       ),
@@ -272,103 +248,6 @@ class _EditShowPageState extends State<EditShowPage> {
               child: const Text('Save'),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class TeamsMultiSelect extends StatefulWidget {
-  final List<String> allTeams;
-  final Set<String> selectedTeams;
-  final ValueChanged<Set<String>> onChanged;
-
-  const TeamsMultiSelect({super.key, required this.allTeams, required this.selectedTeams, required this.onChanged});
-
-  @override
-  State<TeamsMultiSelect> createState() => _TeamsMultiSelectState();
-}
-
-class _TeamsMultiSelectState extends State<TeamsMultiSelect> {
-  late Set<String> selected;
-
-  @override
-  void initState() {
-    super.initState();
-    selected = Set.from(widget.selectedTeams);
-  }
-
-  void _openDialog() async {
-    final tempSelected = Set<String>.from(selected);
-
-    final result = await showDialog<Set<String>>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Select Teams'),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: ListView(
-                  shrinkWrap: true,
-                  children: widget.allTeams.map((team) {
-                    return CheckboxListTile(
-                      title: Text(team),
-                      value: tempSelected.contains(team),
-                      onChanged: (bool? val) {
-                        setState(() {
-                          if (val == true) {
-                            tempSelected.add(team);
-                          } else {
-                            tempSelected.remove(team);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(null),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(tempSelected),
-                  child: const Text('OK'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (result != null) {
-      setState(() => selected = result);
-      widget.onChanged(selected);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final display = selected.isEmpty ? 'Select Teams' : selected.join(', ');
-    return GestureDetector(
-      onTap: _openDialog,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade400),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        constraints: const BoxConstraints(maxWidth: 150),
-        child: Text(
-          display.length > 20 ? '${display.substring(0, 17)}...' : display,
-          style: TextStyle(
-            color: selected.isEmpty ? Colors.grey.shade600 : Colors.black,
-          ),
-          overflow: TextOverflow.ellipsis,
         ),
       ),
     );

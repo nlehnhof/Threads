@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 const uuid = Uuid();
 
-enum Category { ifde, traditionz, tierII, twoPM, tenAM, nineAM, all}
+enum Category { ifde, traditionz, tierII, twoPM, tenAM, nineAM, all }
 
 const categoryIcons = {
   Category.ifde: Icons.dangerous,
@@ -14,6 +14,7 @@ const categoryIcons = {
   Category.nineAM: Icons.newspaper,
   Category.all: Icons.disc_full,
 };
+
 class Shows {
   Shows({
     required this.id,
@@ -35,7 +36,7 @@ class Shows {
   final String tech;
   final Category category;
   final List<String> danceIds;
-  final String adminId; // new field for admin ID
+  final String adminId;
 
   Map<String, dynamic> toJson() {
     return {
@@ -47,7 +48,7 @@ class Shows {
       'tech': tech,
       'category': category.name,
       'danceIds': danceIds,
-      'adminId': adminId, // include admin ID in JSON
+      'adminId': adminId,
     };
   }
 
@@ -59,11 +60,34 @@ class Shows {
       location: json['location'],
       dress: json['dress'],
       tech: json['tech'],
-      adminId: json['adminId'] ?? '', // handle missing admin I
+      adminId: json['adminId'] ?? '',
       category: Category.values.firstWhere((e) => e.name == json['category']),
       danceIds: (json['danceIds'] != null)
           ? List<String>.from(json['danceIds'])
           : <String>[],
+    );
+  }
+
+  // ✅ helper for immutability
+  Shows copyWith({
+    String? title,
+    String? dates,
+    String? location,
+    String? dress,
+    String? tech,
+    Category? category,
+    List<String>? danceIds,
+  }) {
+    return Shows(
+      id: id,
+      title: title ?? this.title,
+      dates: dates ?? this.dates,
+      location: location ?? this.location,
+      dress: dress ?? this.dress,
+      tech: tech ?? this.tech,
+      category: category ?? this.category,
+      danceIds: danceIds ?? this.danceIds,
+      adminId: adminId,
     );
   }
 }

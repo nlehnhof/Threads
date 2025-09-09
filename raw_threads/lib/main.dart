@@ -89,8 +89,14 @@ class MyApp extends StatelessWidget {
             ChangeNotifierProvider<DanceInventoryProvider>(
               create: (_) => DanceInventoryProvider(adminId: adminId)..init(),
             ),
-            ChangeNotifierProvider<ShowsProvider>(
-              create: (_) => ShowsProvider(adminId: adminId)..init(),
+            // ShowsProvider depends on DanceInventoryProvider
+            ChangeNotifierProxyProvider<DanceInventoryProvider, ShowsProvider>(
+              create: (_) => ShowsProvider(adminId: adminId),
+              update: (_, danceProvider, showsProvider) {
+                showsProvider ??= ShowsProvider(adminId: adminId);
+                showsProvider.init(danceProvider);
+                return showsProvider;
+              },
             ),
             ChangeNotifierProvider<TeamProvider>(
               create: (_) => TeamProvider(adminId: adminId)..init(),

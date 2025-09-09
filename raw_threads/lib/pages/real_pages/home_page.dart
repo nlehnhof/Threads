@@ -37,6 +37,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _initUserData() async {
     debugPrint('HomePage: Starting _initUserData');
     final currentUser = FirebaseAuth.instance.currentUser;
+    final danceProvider = context.read<DanceInventoryProvider>();
     if (currentUser == null) {
       setState(() => _loading = false);
       return;
@@ -69,7 +70,7 @@ class _HomePageState extends State<HomePage> {
     final adminId = appState.adminId;
     if (adminId != null) {
       try {
-        await context.read<ShowsProvider>().init();
+        await context.read<ShowsProvider>().init(danceProvider);
         await context.read<DanceInventoryProvider>().init();
       } catch (e) {
         debugPrint('Error initializing providers: $e');
@@ -125,6 +126,8 @@ class _HomePageState extends State<HomePage> {
                   }
                 });
 
+                final danceProvider = context.read<DanceInventoryProvider>();
+
                 if (matchedAdminId != null) {
                   await FirebaseDatabase.instance
                       .ref('users/${currentUser.uid}')
@@ -132,8 +135,8 @@ class _HomePageState extends State<HomePage> {
                   appState.setAdminId(matchedAdminId);
 
                   Navigator.of(ctx).pop();
-
-                  await context.read<ShowsProvider>().init();
+                  
+                  await context.read<ShowsProvider>().init(danceProvider);
                   await context.read<DanceInventoryProvider>().init();
 
                   if (mounted) setState(() {});
