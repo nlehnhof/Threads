@@ -134,6 +134,8 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
       backgroundColor: const Color(0xFFEFF2EF),
       insetPadding: const EdgeInsets.all(20),
       child: Padding(
+        padding: MediaQuery.of(context).viewInsets,
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
           child: Column(
@@ -221,6 +223,7 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

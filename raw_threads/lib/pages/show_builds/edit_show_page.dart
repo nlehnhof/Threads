@@ -164,7 +164,7 @@ class _EditShowPageState extends State<EditShowPage> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Show')),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [

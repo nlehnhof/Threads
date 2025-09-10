@@ -20,33 +20,38 @@ class ShowsProvider extends ChangeNotifier {
 
   Future<void> init(DanceInventoryProvider danceProvider) async {
     try {
-    final snapshot = await db.child('admins/$adminId/shows').get();
-    if (snapshot.exists) {
-      final rawData = snapshot.value as Map<dynamic, dynamic>;
-      
-      // Convert dynamic keys to String
-      final data = rawData.map((key, value) => MapEntry(key.toString(), value));
+      _shows.clear();
+      _danceStatuses.clear();
 
-      data.forEach((showId, showData) {
-        final showJson = Map<String, dynamic>.from(showData as Map);
-        final show = Shows.fromJson(showJson);
-        _shows.add(show);
+      final snapshot = await db.child('admins/$adminId/shows').get();
+      if (snapshot.exists) {
+        final rawData = snapshot.value as Map<dynamic, dynamic>;
+        
+        // Convert dynamic keys to String
+        final data = rawData.map((key, value) => MapEntry(key.toString(), value));
 
-        // handle danceStatuses similarly
-        final danceStatusMap = <String, DanceStatus>{};
-        final rawStatuses = showJson['danceStatuses'];
-        if (rawStatuses is Map) {
-          rawStatuses.forEach((danceId, value) {
-            final danceJson = value as Map;
-            danceStatusMap[danceId.toString()] = DanceStatus(
-              dance: danceProvider.getDanceById(danceId.toString())!,
-              status: danceJson['status']?.toString() ?? 'Not Ready',
-            );
-          });
-        }
+        data.forEach((showId, showData) {
+          final showJson = Map<String, dynamic>.from(showData as Map);
+          final show = Shows.fromJson(showJson);
+          _shows.add(show);
 
-        _danceStatuses[show.id] = danceStatusMap;
-      });
+          // handle danceStatuses similarly
+          final danceStatusMap = <String, DanceStatus>{};
+          final rawStatuses = showJson['danceStatuses'];
+          if (rawStatuses is Map) {
+            rawStatuses.forEach((danceId, value) {
+              final danceJson = value as Map;
+              final dance = danceProvider.getDanceById(danceId.toString());
+              if (dance != null) {
+                danceStatusMap[danceId.toString()] = DanceStatus(
+                  dance: danceProvider.getDanceById(danceId.toString())!,
+                  status: danceJson['status']?.toString() ?? 'Not Ready',
+                );
+              }
+            });
+          }
+          _danceStatuses[show.id] = danceStatusMap;
+        });
 
         notifyListeners();
       }

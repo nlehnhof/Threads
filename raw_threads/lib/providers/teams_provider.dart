@@ -125,8 +125,6 @@ class TeamProvider extends ChangeNotifier {
     final teamId = _db.child('admins/$adminId/teams').push().key!;
     final newTeam = Teams(id: teamId, title: title, members: [], assigned: []);
     await _db.child('admins/$adminId/teams/$teamId').set(newTeam.toJson());
-
-    teams.add(newTeam);
     notifyListeners();
   }
 
@@ -152,10 +150,27 @@ class TeamProvider extends ChangeNotifier {
     await _db.child('admins/$adminId/teams/$teamId/members').set(team.members);
   }
 
+  Future<void> unlinkUser(String userId) async {
+    // Clear user’s linked admin info
+    await _db.child('users/$userId/linkedAdminId').remove();
+    await _db.child('users/$userId/admincode').remove();
+
+    // Remove from local unassigned list
+    unassignedUsers.removeWhere((u) => u['uid'] == userId);
+
+    notifyListeners();
+  }
+
   Future<void> removeUserFromTeam(String userId, String teamId) async {
-    final team = teams.firstWhere((t) => t.id == teamId);
-    team.members.remove(userId);
-    await _db.child('admins/$adminId/teams/$teamId/members').set(team.members);
+    final teamIndex = teams.indexWhere((t) => t.id == teamId);
+    if (teamIndex == -1) return;
+
+    final team = teams[teamIndex];
+    if (team.members.contains(userId)) {
+      team.members.remove(userId);
+      await _db.child('admins/$adminId/teams/$teamId/members').set(team.members);
+      notifyListeners();
+    }
   }
 
   // --- Dance assignment ---

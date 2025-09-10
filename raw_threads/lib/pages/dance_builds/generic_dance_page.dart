@@ -140,6 +140,7 @@ class _GenericDancePageState extends State<GenericDancePage> {
 
     return Scaffold(
       backgroundColor: myColors.secondary,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         centerTitle: true,
         backgroundColor: myColors.secondary,
@@ -197,8 +198,14 @@ class _GenericDancePageState extends State<GenericDancePage> {
             ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
+      body: SafeArea( 
+        child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          left: 10,
+          right: 10,
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          top: 15,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -237,6 +244,7 @@ class _GenericDancePageState extends State<GenericDancePage> {
             const SizedBox(height: 44),
           ],
         ),
+      ),
       ),
     );
   }

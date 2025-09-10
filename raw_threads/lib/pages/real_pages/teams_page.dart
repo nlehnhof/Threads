@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:raw_threads/classes/main_classes/teams.dart';
+import 'package:raw_threads/providers/dance_inventory_provider.dart';
 import 'package:raw_threads/providers/teams_provider.dart';
 import 'package:raw_threads/account/app_state.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
@@ -145,10 +146,9 @@ class _TeamsPageState extends State<TeamsPage> {
                                         padding: const EdgeInsets.symmetric(vertical: 4),
                                         child: Text(
                                           username,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 16,
-                                            color: Colors.blue, // hint it's tappable
-                                            decoration: TextDecoration.underline,
+                                            color: myColors.primary, // hint it's tappable
                                           ),
                                         ),
                                       ),
@@ -287,23 +287,103 @@ class _TeamsPageState extends State<TeamsPage> {
 
   void _showEditTeamDialog(BuildContext context, TeamProvider provider, Teams team) {
     final controller = TextEditingController(text: team.title);
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Edit Team Name'),
-        content: TextField(controller: controller, decoration: const InputDecoration(hintText: 'Team Name')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              final newName = controller.text.trim();
-              if (newName.isNotEmpty && newName != team.title) provider.renameTeam(team.id, newName);
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
+      builder: (_) {
+        return AlertDialog(
+          title: const Text('Edit Team'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // --- Title ---
+                TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(labelText: "Team Name"),
+                ),
+                const SizedBox(height: 16),
+                // --- Assigned dances ---
+                const Text("Assigned Dances", style: TextStyle(fontWeight: FontWeight.bold)),
+                team.assigned.isEmpty
+                    ? const Text("No dances assigned.")
+                    : Column(
+                        children: team.assigned.map((danceId) {
+                          final danceProvider = context.read<DanceInventoryProvider>();
+                          final dance = danceProvider.getDanceById(danceId);
+                          return ListTile(
+                            title: Text(dance!.title),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.remove_circle, color: Colors.red),
+                              onPressed: () {
+                                provider.unassignDanceFromTeam(team.id, danceId);
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                const SizedBox(height: 16),
+
+                // --- Team members ---
+                const Text("Team Members", style: TextStyle(fontWeight: FontWeight.bold)),
+                team.members.isEmpty
+                    ? const Text("No members in this team.")
+                    : Column(
+                        children: team.members.map((uid) {
+                          final username = provider.usernameFor(uid);
+                          return ListTile(
+                            title: Text(username),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.remove_circle, color: Colors.red),
+                              onPressed: () {
+                                provider.removeUserFromTeam(uid, team.id);
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                const SizedBox(height: 16),
+
+                // --- Unassigned users ---
+                const Text("Unassigned Users", style: TextStyle(fontWeight: FontWeight.bold)),
+                provider.unassignedUsers.isEmpty
+                    ? const Text("No unassigned users.")
+                    : Column(
+                        children: provider.unassignedUsers.map((user) {
+                          return ListTile(
+                            title: Text(user['username']),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.link_off, color: Colors.red),
+                              tooltip: "Unlink user from admin",
+                              onPressed: () {
+                                provider.unlinkUser(user['uid']);
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
+              ],
+            ),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final newName = controller.text.trim();
+                if (newName.isNotEmpty && newName != team.title) {
+                  provider.renameTeam(team.id, newName);
+                }
+                Navigator.pop(context);
+              },
+              child: const Text("Save"),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -321,10 +401,9 @@ class _TeamsPageState extends State<TeamsPage> {
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+            child: Text('Delete', style: TextStyle(color: myColors.secondary))),
+          ],
+        ),
     );
   }
 }
