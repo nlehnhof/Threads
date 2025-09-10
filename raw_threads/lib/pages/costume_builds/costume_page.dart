@@ -32,18 +32,20 @@ class _CostumePageState extends State<CostumePage> {
   bool get isAdmin => widget.role == 'admin';
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
+  void initState() {
+    super.initState();
 
-    final costumesProvider = context.read<CostumesProvider>();
-    final adminId = context.read<AppState>().adminId;
-    if (adminId == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final costumesProvider = context.read<CostumesProvider>();
+      final adminId = context.read<AppState>().adminId;
+      if (adminId == null) return;
 
-    // Initialize costumesProvider with current danceId and gender.
-    costumesProvider.init(
-      danceId: widget.dance.id,
-      gender: widget.gender,
-    );
+      // Initialize costumesProvider with current danceId and gender
+      await costumesProvider.init(
+        danceId: widget.dance.id,
+        gender: widget.gender,
+      );
+    });
   }
 
   Future<void> _addOrEditCostume({CostumePiece? existing}) async {

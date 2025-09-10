@@ -25,6 +25,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   bool get isAdmin => widget.role == 'admin';
   bool _loading = true;
+  bool _initialized = false;
 
   @override
   void initState() {
@@ -36,6 +37,8 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _initUserData() async {
     debugPrint('HomePage: Starting _initUserData');
+    if (_initialized) return;
+    _initialized = true;
     final currentUser = FirebaseAuth.instance.currentUser;
     final danceProvider = context.read<DanceInventoryProvider>();
     if (currentUser == null) {

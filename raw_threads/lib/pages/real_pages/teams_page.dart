@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:raw_threads/classes/main_classes/teams.dart';
+import 'package:raw_threads/pages/dance_builds/generic_dance_page.dart';
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
 import 'package:raw_threads/providers/teams_provider.dart';
 import 'package:raw_threads/account/app_state.dart';
@@ -63,110 +64,145 @@ class _TeamsPageState extends State<TeamsPage> {
     });
   }
 
-  Widget _adminView(TeamProvider provider) {    
-    return Scaffold(
+Widget _adminView(TeamProvider provider) {
+  return Scaffold(
+    backgroundColor: myColors.secondary,
+    appBar: AppBar(
+      automaticallyImplyLeading: false,
       backgroundColor: myColors.secondary,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: myColors.secondary,
-        title: Image.asset('assets/logotype_green.png', height: 20),
-        actions: [Builder(builder: (context) => IconButton(icon: const Icon(Icons.menu), onPressed: () => Scaffold.of(context).openEndDrawer()))],
-      ),
-      endDrawer: Sidebar(role: widget.role),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Teams', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'Vogun')),
-            const SizedBox(height: 10),
-            Text(' Admin Code: ${provider.adminCode}', style: const TextStyle(fontSize: 18, color: Colors.grey)),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(icon: const Icon(Icons.add), label: const Text('Add Team'), onPressed: () => _showAddTeamDialog(context, provider)),
+      title: Image.asset('assets/logotype_green.png', height: 20),
+      actions: [
+        Builder(
+          builder: (context) =>
+              IconButton(icon: const Icon(Icons.menu), onPressed: () => Scaffold.of(context).openEndDrawer()),
+        )
+      ],
+    ),
+    endDrawer: Sidebar(role: widget.role),
+    body: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Teams', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'Vogun')),
+          const SizedBox(height: 10),
+          Text('Admin Code: ${provider.adminCode}', style: const TextStyle(fontSize: 18, color: Colors.grey)),
+          const SizedBox(height: 8),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.add),
+            label: const Text('Add Team'),
+            onPressed: () => _showAddTeamDialog(context, provider),
+          ),
+          const Divider(),
+          // --- Unassigned Users (outside team cards) ---
+          if (provider.unassignedUsers.isNotEmpty) ...[
+            const Text('Unassigned Users:', style: TextStyle(fontWeight: FontWeight.bold)),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: provider.unassignedUsers.map((user) {
+                return ActionChip(
+                  label: Text(user['username'] ?? 'Unknown'),
+                  onPressed: () => _showAssignUserDialog(context, provider, user['uid']!),
+                );
+              }).toList(),
+            ),
             const Divider(),
-            if (provider.unassignedUsers.isNotEmpty) ...[
-              const Text('Unassigned Users:', style: TextStyle(fontWeight: FontWeight.bold)),
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: provider.unassignedUsers.map((user) {
-                  return ActionChip(
-                    label: Text(user['username'] ?? 'Unknown'),
-                    onPressed: () => _showAssignUserDialog(context, provider, user['uid']!),
-                  );
-                }).toList(),
-              ),
-              const Divider(),
-            ],
-            Expanded(
-              child: ListView.builder(
-                itemCount: provider.teams.length,
-                itemBuilder: (context, index) {
-                  final team = provider.teams[index];
-                  return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  team.title, 
-                                  style: const TextStyle(
-                                    fontSize: 18, 
-                                    fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+          ],
+
+          // --- Team list ---
+          Expanded(
+            child: ListView.builder(
+              itemCount: provider.teams.length,
+              itemBuilder: (context, index) {
+                final team = provider.teams[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                team.title,
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                               ),
-                              IconButton(icon: const Icon(Icons.edit), onPressed: () => _showEditTeamDialog(context, provider, team)),
-                              IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _confirmDeleteTeam(context, provider, team)),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          const Text('Members:', style: TextStyle(fontWeight: FontWeight.bold)),
-                          team.members.isEmpty
-                              ? const Text('No members assigned')
-                              : Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: team.members.map((uid) {
-                                    final username = provider.usernameFor(uid);
-                                    return InkWell(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => MemberProfile(userId: uid),
-                                          ),
-                                        );
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 4),
-                                        child: Text(
-                                          username,
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            color: myColors.primary, // hint it's tappable
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ],
                             ),
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () => _showEditTeamDialog(context, provider, team),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _confirmDeleteTeam(context, provider, team),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        // --- Members ---
+                        const Text('Members:', style: TextStyle(fontWeight: FontWeight.bold)),
+                        if (team.members.isEmpty)
+                          const Text('No members assigned')
+                        else
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: team.members.map((uid) {
+                              final username = provider.usernameFor(uid);
+                              return InkWell(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => MemberProfile(userId: uid),
+                                    ),
+                                  );
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Text(
+                                    username,
+                                    style: TextStyle(fontSize: 16, color: myColors.primary),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
                           ),
-                        );
-                      },
+                        const SizedBox(height: 8),
+                        // --- Assigned Dances ---
+                        const Text('Assigned Dances:', style: TextStyle(fontWeight: FontWeight.bold)),
+                        if (team.assigned.isEmpty)
+                          const Text('No dances assigned')
+                        else
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: team.assigned.map((danceId) {
+                              final danceProvider = context.read<DanceInventoryProvider>();
+                              final dance = danceProvider.getDanceById(danceId);
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                child: Text(
+                                  dance!.title,
+                                  style: TextStyle(fontSize: 16, color: myColors.primary),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                      ],
                     ),
                   ),
-                ],    
-              ),
+                );
+              },
             ),
-          );
-  }
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   Widget _userView(TeamProvider provider) {
     final team = provider.teams.firstWhere((t) => t.id == provider.assignedTeamId, orElse: () => Teams(id: '', title: 'No team assigned', members: [], assigned: []));
@@ -208,6 +244,22 @@ class _TeamsPageState extends State<TeamsPage> {
                                 );
                               }),
                             ],
+                          ),
+                    team.assigned.isEmpty
+                        ? const Text('No dances assigned')
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: team.assigned.map((danceId) {
+                              final danceProvider = context.read<DanceInventoryProvider>();
+                              final dance = danceProvider.getDanceById(danceId);
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                child: Text(
+                                  dance!.title,
+                                  style: TextStyle(fontSize: 16, color: myColors.primary),
+                                ),
+                              );
+                            }).toList(),
                           ),
                   ],
                 ),
@@ -344,25 +396,6 @@ class _TeamsPageState extends State<TeamsPage> {
                         }).toList(),
                       ),
                 const SizedBox(height: 16),
-
-                // --- Unassigned users ---
-                const Text("Unassigned Users", style: TextStyle(fontWeight: FontWeight.bold)),
-                provider.unassignedUsers.isEmpty
-                    ? const Text("No unassigned users.")
-                    : Column(
-                        children: provider.unassignedUsers.map((user) {
-                          return ListTile(
-                            title: Text(user['username']),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.link_off, color: Colors.red),
-                              tooltip: "Unlink user from admin",
-                              onPressed: () {
-                                provider.unlinkUser(user['uid']);
-                              },
-                            ),
-                          );
-                        }).toList(),
-                      ),
               ],
             ),
           ),

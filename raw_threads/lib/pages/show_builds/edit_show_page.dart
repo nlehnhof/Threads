@@ -7,6 +7,7 @@ import 'package:raw_threads/classes/main_classes/dances.dart';
 import 'package:raw_threads/pages/show_builds/dance_selection_page.dart';
 import 'package:raw_threads/pages/show_builds/dance_with_status.dart';
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
+import 'package:raw_threads/classes/style_classes/my_colors.dart';
 
 class EditShowPage extends StatefulWidget {
   final Shows show;
@@ -163,7 +164,10 @@ class _EditShowPageState extends State<EditShowPage> {
         .toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Show')),
+      backgroundColor: myColors.secondary,
+      appBar: AppBar(title: const Text('Edit Show'),
+        backgroundColor: myColors.secondary,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -185,13 +189,14 @@ class _EditShowPageState extends State<EditShowPage> {
               ],
             ),
             const SizedBox(height: 8),
-            Expanded(
+            SizedBox(
+              height: selectedDances.length * 80.0, // approximate height per card
               child: ListView.builder(
+                physics: const NeverScrollableScrollPhysics(), // prevent inner scrolling
                 itemCount: selectedDances.length,
-                itemBuilder: (ctx, index) {
+                itemBuilder: (context, index) {
                   final dance = selectedDances[index];
                   final danceStatus = danceStatusMap[dance.id]!;
-
                   return Card(
                     margin: const EdgeInsets.symmetric(vertical: 6),
                     child: Padding(
@@ -206,16 +211,13 @@ class _EditShowPageState extends State<EditShowPage> {
                                 .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                                 .toList(),
                             onChanged: (val) {
-                              if (val != null) {
-                                setState(() => danceStatus.status = val);
-                              }
+                              if (val != null) setState(() => danceStatus.status = val);
                             },
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete, color: Colors.redAccent),
                             onPressed: () async {
                               final danceId = dance.id;
-
                               setState(() {
                                 _selectedDanceIds.remove(danceId);
                                 danceStatusMap.remove(danceId);
@@ -224,10 +226,8 @@ class _EditShowPageState extends State<EditShowPage> {
                               final db = FirebaseDatabase.instance.ref();
                               final showRef = db.child('admins/${widget.show.adminId}/shows/${widget.show.id}');
 
-                              // Remove danceStatus entry
                               await showRef.child('danceStatuses/$danceId').remove();
 
-                              // Remove danceId from the show's danceIds array
                               final snapshot = await showRef.child('danceIds').get();
                               if (snapshot.exists) {
                                 final List<dynamic> danceIds = List<dynamic>.from(snapshot.value as List);
@@ -243,6 +243,7 @@ class _EditShowPageState extends State<EditShowPage> {
                 },
               ),
             ),
+            const Divider(),
             ElevatedButton(
               onPressed: () => _saveShow(context),
               child: const Text('Save'),

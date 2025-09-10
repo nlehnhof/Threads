@@ -3,6 +3,7 @@ import 'package:firebase_database/firebase_database.dart';
 import '../classes/main_classes/shows.dart';
 import 'dance_inventory_provider.dart';
 import '../pages/show_builds/dance_with_status.dart';
+import 'dart:async';
 
 class ShowsProvider extends ChangeNotifier {
   final String adminId;
@@ -18,47 +19,64 @@ class ShowsProvider extends ChangeNotifier {
   Map<String, DanceStatus> getDanceStatuses(String showId) =>
       _danceStatuses[showId] ?? {};
 
+  bool _initialized = false; // Add to ShowsProvider
+
   Future<void> init(DanceInventoryProvider danceProvider) async {
+    if (_initialized) return; // Prevent multiple initializations
+    _initialized = true;
+
     try {
+      // Clear previous data
       _shows.clear();
       _danceStatuses.clear();
 
       final snapshot = await db.child('admins/$adminId/shows').get();
-      if (snapshot.exists) {
-        final rawData = snapshot.value as Map<dynamic, dynamic>;
-        
-        // Convert dynamic keys to String
-        final data = rawData.map((key, value) => MapEntry(key.toString(), value));
-
-        data.forEach((showId, showData) {
-          final showJson = Map<String, dynamic>.from(showData as Map);
-          final show = Shows.fromJson(showJson);
-          _shows.add(show);
-
-          // handle danceStatuses similarly
-          final danceStatusMap = <String, DanceStatus>{};
-          final rawStatuses = showJson['danceStatuses'];
-          if (rawStatuses is Map) {
-            rawStatuses.forEach((danceId, value) {
-              final danceJson = value as Map;
-              final dance = danceProvider.getDanceById(danceId.toString());
-              if (dance != null) {
-                danceStatusMap[danceId.toString()] = DanceStatus(
-                  dance: danceProvider.getDanceById(danceId.toString())!,
-                  status: danceJson['status']?.toString() ?? 'Not Ready',
-                );
-              }
-            });
-          }
-          _danceStatuses[show.id] = danceStatusMap;
-        });
-
+      if (!snapshot.exists) {
         notifyListeners();
+        return;
       }
+
+      final rawData = snapshot.value as Map<dynamic, dynamic>;
+      final data = rawData.map((key, value) => MapEntry(key.toString(), value));
+
+      final List<Shows> loadedShows = [];
+      final Map<String, Map<String, DanceStatus>> loadedStatuses = {};
+
+      data.forEach((showId, showData) {
+        final showJson = Map<String, dynamic>.from(showData as Map);
+        final show = Shows.fromJson(showJson);
+
+        // Prevent duplicate show IDs
+        if (!loadedShows.any((s) => s.id == show.id)) {
+          loadedShows.add(show);
+        }
+
+        final danceStatusMap = <String, DanceStatus>{};
+        final rawStatuses = showJson['danceStatuses'];
+        if (rawStatuses is Map) {
+          rawStatuses.forEach((danceId, value) {
+            final danceJson = value as Map;
+            final dance = danceProvider.getDanceById(danceId.toString());
+            if (dance != null) {
+              danceStatusMap[danceId.toString()] = DanceStatus(
+                dance: dance,
+                status: danceJson['status']?.toString() ?? 'Not Ready',
+              );
+            }
+          });
+        }
+        loadedStatuses[show.id] = danceStatusMap;
+      });
+
+      _shows.addAll(loadedShows);
+      _danceStatuses.addAll(loadedStatuses);
+
+      notifyListeners();
     } catch (e) {
       debugPrint('Error initializing ShowsProvider: $e');
     }
   }
+
 
   // Add a new show
   Future<void> addShow(Shows show) async {

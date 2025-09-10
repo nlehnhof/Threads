@@ -198,56 +198,81 @@ class _GenericDancePageState extends State<GenericDancePage> {
             ),
         ],
       ),
-      body: SafeArea( 
-        child: SingleChildScrollView(
-        padding: EdgeInsets.only(
-          left: 10,
-          right: 10,
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          top: 15,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildImageCard(dance.leftImagePath),
-                const SizedBox(width: 4.0),
-                _buildImageCard(dance.rightImagePath),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _buildInfoText(dance.title, fontSize: 28, isBold: true),
-            _buildInfoText(dance.country, fontSize: 16),
-            const SizedBox(height: 24),
-            _buildButton(context, 'Men'),
-            const SizedBox(height: 8),
-            _buildButton(context, 'Women'),
-            const Spacer(),
-            if (isAdmin)
-              SizedBox(
-                width: 337,
-                height: 60,
-                child: OutlinedButton(
-                  onPressed: () => _showAssignDanceToTeamDialog(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    backgroundColor: myColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: EdgeInsets.only(
+                left: 10,
+                right: 10,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                top: 15,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight, // ensures column fills screen
+                ),
+                child: IntrinsicHeight(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Images row with horizontal scroll if needed
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _buildImageCard(dance.leftImagePath),
+                            const SizedBox(width: 8),
+                            _buildImageCard(dance.rightImagePath),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      // Dance info
+                      _buildInfoText(dance.title, fontSize: 28, isBold: true),
+                      _buildInfoText(dance.country, fontSize: 16),
+                      const SizedBox(height: 24),
+
+                      // Gender buttons
+                      _buildButton(context, 'Men'),
+                      const SizedBox(height: 8),
+                      _buildButton(context, 'Women'),
+
+                      // Flexible spacer to push bottom button to bottom
+                      const Spacer(),
+                      if (isAdmin)
+                        Align(
+                          alignment: Alignment.bottomCenter,
+                          child: SizedBox(
+                            width: 337,
+                            height: 60,
+                            child: OutlinedButton(
+                              onPressed: () => _showAssignDanceToTeamDialog(context),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                backgroundColor: myColors.primary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text('Assign to Team'),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 50),
+                      ],
                     ),
                   ),
-                  child: const Text('Assign to Team'),
                 ),
-              ),
-            const SizedBox(height: 44),
-          ],
+              );
+            },
+          ),
         ),
-      ),
-      ),
-    );
-  }
+      );
+    }
 
   Widget _buildImageCard(String? imagePath) {
     return Card(
