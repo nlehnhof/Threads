@@ -15,7 +15,7 @@ class Cover extends StatelessWidget {
             Positioned(
                 left: -960,
                 top: -443,
-                child: Container(
+                child: SizedBox(
                     width: 2347,
                     height: 1911,
                     child: Stack(

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:raw_threads/classes/main_classes/teams.dart';
-import 'package:raw_threads/pages/dance_builds/generic_dance_page.dart';
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
 import 'package:raw_threads/providers/teams_provider.dart';
 import 'package:raw_threads/account/app_state.dart';

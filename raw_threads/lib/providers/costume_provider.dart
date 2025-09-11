@@ -57,7 +57,9 @@ class CostumesProvider extends ChangeNotifier {
       if (data != null && data is Map) {
         data.forEach((key, value) {
           try {
-            final costume = CostumePiece.fromJson(Map<String, dynamic>.from(value));
+            final map = Map<String, dynamic>.from(value);
+            map['id'] = key; // ensure ID persists
+            final costume = CostumePiece.fromJson(map);
             _costumes.add(costume);
           } catch (e) {
             if (kDebugMode) {

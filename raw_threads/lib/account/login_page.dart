@@ -42,7 +42,7 @@ class _LoginPageState extends State<LoginPage> {
         await userRef.set({
           "email": appUser.email,
           "role": "user", // default unless you assign admin manually
-          "linkedAdminCode": null,
+          "linkedAdminId": null,
         });
       }
 

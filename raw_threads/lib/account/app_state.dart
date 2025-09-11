@@ -54,32 +54,31 @@ class AppState extends ChangeNotifier {
 
     try {
       final userSnap = await FirebaseDatabase.instance.ref('users/$uid').get();
-      final userData = userSnap.exists ? Map<String, dynamic>.from(userSnap.value as Map) : {};
+      final userData = userSnap.exists 
+          ? Map<String, dynamic>.from(userSnap.value as Map) 
+          : {};
 
       final String roleFromDb = userData['role'] as String? ?? 'user';
       _role = roleFromDb;
 
       if (roleFromDb == 'admin') {
         _adminId = uid;
-        _adminCode = null;
       } else {
-        final String? linkedCode = userData['linkedAdminCode'] as String?;
-        _adminCode = linkedCode;
-        _adminId = null;
-
-        if (linkedCode != null) {
-          final adminsSnap = await FirebaseDatabase.instance.ref('admins').get();
-          if (adminsSnap.exists) {
-            for (final adminEntry in adminsSnap.children) {
-              final codeSnap = adminEntry.child('admincode');
-              if (codeSnap.exists && codeSnap.value == linkedCode) {
-                _adminId = adminEntry.key;
-                break;
-              }
-            }
-          }
-        }
+        _adminId = userData['linkedAdminId'] as String?;
       }
+
+        // if (linkedCode != null) {
+        //   final adminsSnap = await FirebaseDatabase.instance.ref('admins').get();
+        //   if (adminsSnap.exists) {
+        //     for (final adminEntry in adminsSnap.children) {
+        //       final codeSnap = adminEntry.child('admincode');
+        //       if (codeSnap.exists && codeSnap.value == linkedCode) {
+        //         _adminId = adminEntry.key;
+        //         break;
+        //       }
+        //     }
+        //   }
+        // }
     } catch (e) {
       debugPrint('Error initializing AppState: $e');
       reset();

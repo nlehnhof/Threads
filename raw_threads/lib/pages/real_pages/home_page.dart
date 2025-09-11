@@ -120,25 +120,29 @@ class _HomePageState extends State<HomePage> {
                   return;
                 }
 
-                final adminsMap = Map<String, dynamic>.from(adminsSnapshot.value as Map);
+                // final adminsMap = Map<String, dynamic>.from(adminsSnapshot.value as Map);
                 String? matchedAdminId;
-                adminsMap.forEach((key, value) {
-                  final adminData = Map<String, dynamic>.from(value);
-                  if (adminData['admincode'] == adminCode) {
-                    matchedAdminId = key;
+                for (final adminEntry in adminsSnapshot.children) {
+                  final codeSnap = adminEntry.child('admincode');
+                  if (codeSnap.exists && codeSnap.value == adminCode) {
+                    matchedAdminId = adminEntry.key;
+                    break;
                   }
-                });
-
-                final danceProvider = context.read<DanceInventoryProvider>();
+                }
 
                 if (matchedAdminId != null) {
+                  // Save linkedAdminId under the user
                   await FirebaseDatabase.instance
                       .ref('users/${currentUser.uid}')
                       .update({'linkedAdminId': matchedAdminId});
+
+                  // Update AppState
                   appState.setAdminId(matchedAdminId);
 
-                  Navigator.of(ctx).pop();
-                  
+                  if (mounted) Navigator.of(ctx).pop();
+
+                  // Initialize providers
+                  final danceProvider = context.read<DanceInventoryProvider>();
                   await context.read<ShowsProvider>().init(danceProvider);
                   await context.read<DanceInventoryProvider>().init();
 
@@ -151,6 +155,7 @@ class _HomePageState extends State<HomePage> {
                   }
                 }
               } catch (e) {
+                debugPrint('Error linking admin: $e');
                 if (mounted) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
                     const SnackBar(content: Text('Error linking to admin')),

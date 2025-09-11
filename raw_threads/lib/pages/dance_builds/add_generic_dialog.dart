@@ -88,8 +88,11 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
     if (pickedFile == null) return;
 
     setState(() {
-      if (isLeft) selectedLeftImage = pickedFile;
-      else selectedRightImage = pickedFile;
+      if (isLeft) {
+        selectedLeftImage = pickedFile;
+      } else {
+        selectedRightImage = pickedFile;
+      }
     });
 
     // Start background upload
@@ -120,8 +123,11 @@ class _AddGenericDialogState extends State<AddGenericDialog> {
     } else {
       // Upload failed, keep local file but mark as not uploading
       setState(() {
-        if (isLeft) isUploadingLeft = false;
-        else isUploadingRight = false;
+        if (isLeft) {
+          isUploadingLeft = false;
+        } else {
+          isUploadingRight = false;
+        }
       });
     }
   }

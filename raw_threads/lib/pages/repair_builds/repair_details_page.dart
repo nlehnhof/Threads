@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:raw_threads/classes/main_classes/issues.dart';
 import 'package:provider/provider.dart';
@@ -11,7 +10,6 @@ import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:raw_threads/pages/repair_builds/repair_summary_page.dart';
 import 'package:uuid/uuid.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:raw_threads/services/storage_service.dart';
 
 final uuid = Uuid();

@@ -54,7 +54,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Future<void> pickImage() async {
     final userId = currentUser!.uid; // or adminId/danceId path
     final storagePath = 'users/$userId/profile_photos'; // storage folder
-    final dbPath = 'users/$userId/profile_photos';      // database path
 
     // Pick, upload, and save URL to database
     final uploadedUrl = await StorageHelper.pickUploadAndReturnUrl(
@@ -197,7 +196,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   ],
                 ),
               );
-            }).toList(),
+            }),
             const SizedBox(height: 10),
             ElevatedButton(onPressed: _addSize, child: const Text('Add Size')),
             const SizedBox(height: 20),
