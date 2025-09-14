@@ -59,7 +59,7 @@ class Sidebar extends StatelessWidget {
 
             // Bottom section
             SidebarItem(
-                destinationBuilder: () => ProfilePage(role: role),
+                destinationBuilder: () => ProfilePage(),
                 image: 'assets/profile.png'),
             const SizedBox(height: 10),
             SidebarItem(

@@ -23,7 +23,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   File? _photo;
   String? _photoUrl;
 
-  // Use a list of items with persistent controllers (avoid creating controllers in build).
   final List<_SizeItem> _sizeItems = [];
 
   @override
@@ -32,7 +31,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     usernameController.text = widget.user.username;
     phoneController.text = widget.user.phoneNumber ?? '';
 
-    // Initialize size items from the user's sizes map
     if (widget.user.sizes.isNotEmpty) {
       widget.user.sizes.forEach((title, size) {
         _sizeItems.add(_SizeItem(title: title, value: size));
@@ -51,33 +49,60 @@ class _EditProfilePageState extends State<EditProfilePage> {
     super.dispose();
   }
 
-  Future<void> pickImage() async {
-    final userId = currentUser!.uid; // or adminId/danceId path
-    final storagePath = 'users/$userId/profile_photos'; // storage folder
+  Future<void> _showPickImageOptions() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickAndUploadImage(fromCamera: false);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Take a Photo'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickAndUploadImage(fromCamera: true);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-    // Pick, upload, and save URL to database
+  Future<void> _pickAndUploadImage({required bool fromCamera}) async {
+    if (currentUser == null) return;
+    final userId = currentUser!.uid;
+    final storagePath = 'users/$userId/profile_photos';
+
     final uploadedUrl = await StorageHelper.pickUploadAndReturnUrl(
       storagePath: storagePath,
-      fromCamera: false,
+      fromCamera: fromCamera,
     );
 
     if (uploadedUrl != null) {
       setState(() {
         _photoUrl = uploadedUrl;
-        _photo = null; // we now use URL instead of local file
+        _photo = null;
       });
 
-      // Save locally if you want persistent offline reference
+      // optional: cache locally
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('profile_photo_path', uploadedUrl);
-    } else {
-      print('Image upload failed or was canceled.');
     }
   }
 
   void _addSize() {
     setState(() {
-      // Add one new item (two input fields will appear: Title + Size)
       _sizeItems.add(_SizeItem(title: '', value: ''));
     });
   }
@@ -86,7 +111,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (currentUser == null) return;
     final userRef = FirebaseDatabase.instance.ref('users/${currentUser!.uid}');
 
-    // Build sizes map from current items (skip empty titles)
     final Map<String, String> sizesToSave = {};
     for (final item in _sizeItems) {
       final title = item.titleController.text.trim();
@@ -94,23 +118,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
       if (title.isNotEmpty) sizesToSave[title] = value;
     }
 
-    // Prepare update map — only the fields that changed
     final Map<String, Object?> updates = {
       'username': usernameController.text.trim(),
       'phoneNumber': phoneController.text.trim(),
       'sizes': sizesToSave,
     };
 
-    if (_photoUrl != null) updates['photoUrl'] = _photoUrl; 
+    if (_photoUrl != null) updates['photoURL'] = _photoUrl; // FIX ✅
 
     try {
-      // Use update() to avoid wiping out other fields (like adminLinkedId)
       await userRef.update(updates);
       if (context.mounted) Navigator.pop(context);
     } catch (e) {
-      // handle save error
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving profile: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving profile: $e')),
+        );
       }
     }
   }
@@ -127,9 +150,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     return Scaffold(
       backgroundColor: myColors.secondary,
       appBar: AppBar(
-        iconTheme: IconThemeData(
-          color: myColors.secondary, // <-- sets back button color
-        ),
+        iconTheme: IconThemeData(color: myColors.secondary),
         title: Text(
           'Edit Profile',
           style: TextStyle(
@@ -146,7 +167,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         child: Column(
           children: [
             GestureDetector(
-              onTap: pickImage,
+              onTap: _showPickImageOptions,
               child: CircleAvatar(
                 radius: 50,
                 backgroundImage: _photo != null
@@ -160,16 +181,24 @@ class _EditProfilePageState extends State<EditProfilePage> {
               ),
             ),
             const SizedBox(height: 16),
-            TextField(controller: usernameController, decoration: const InputDecoration(labelText: 'Username')),
-            TextField(controller: phoneController, decoration: const InputDecoration(labelText: 'Phone Number')),
+            TextField(
+              controller: usernameController,
+              decoration: const InputDecoration(labelText: 'Username'),
+            ),
+            TextField(
+              controller: phoneController,
+              decoration: const InputDecoration(labelText: 'Phone Number'),
+            ),
             const SizedBox(height: 20),
             Align(
               alignment: Alignment.centerLeft,
-              child: const Text('Sizes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Sizes',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(height: 10),
 
-            // Build size rows from _sizeItems (controllers are persistent)
             ..._sizeItems.asMap().entries.map((entry) {
               final index = entry.key;
               final item = entry.value;
@@ -203,7 +232,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
             const SizedBox(height: 10),
             ElevatedButton(onPressed: _addSize, child: const Text('Add Size')),
             const SizedBox(height: 20),
-            ElevatedButton(onPressed: _saveProfile, child: const Text('Save Changes')),
+            ElevatedButton(
+              onPressed: _saveProfile,
+              child: const Text('Save Changes'),
+            ),
           ],
         ),
       ),
@@ -211,7 +243,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 }
 
-// Helper class to hold controllers per size row
 class _SizeItem {
   final TextEditingController titleController;
   final TextEditingController valueController;
