@@ -20,23 +20,28 @@ class RepairProvider extends ChangeNotifier {
   RepairProvider({required this.adminId});
 
   Future<void> init() async {
-    // Cancel previous subscription
-    await _repairSubscription?.cancel();
+    // 1️⃣ Load cached repairs immediately
+    await loadFromLocal();
 
+    // 2️⃣ Set up Firebase listener
+    await _repairSubscription?.cancel();
     final ref = FirebaseDatabase.instance.ref('admins/$adminId/repairs');
 
-    // Inside onValue listener
     _repairSubscription = ref.onValue.listen((event) {
       final repairsMap = event.snapshot.value as Map<dynamic, dynamic>?;
-
       _parseRepairs(repairsMap);
+      _saveLocally(); // update local cache
       notifyListeners();
     });
 
-    // And after initial get()
+    // 3️⃣ Fetch initial data from Firebase in background
     final snapshot = await ref.get();
-    _parseRepairs(snapshot.value as Map<dynamic, dynamic>?);
-    notifyListeners();
+    final repairsMap = snapshot.value as Map<dynamic, dynamic>?;
+    if (repairsMap != null) {
+      _parseRepairs(repairsMap);
+      await _saveLocally();
+      notifyListeners();
+    }
   }
 
   void _parseRepairs(Map<dynamic, dynamic>? repairsMap) {

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:raw_threads/services/auth_service.dart';
 import 'package:raw_threads/pages/real_pages/home_page.dart'; 
-import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:raw_threads/classes/style_classes/primary_button.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:raw_threads/account/app_state.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -21,11 +22,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
   List<bool> isSelected = [true, false];
   bool isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-  }
 
   @override
   void dispose() {
@@ -68,21 +64,19 @@ class _SignUpPageState extends State<SignUpPage> {
 
   Future<void> _signUp() async {
     final localContext = context;
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
     try {
       String selectedRole = isSelected[0] ? 'user' : 'admin';
 
-      // Create account with role
+      // 1️⃣ Create account
       await authService.value.createAccount(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
         role: selectedRole,
       );
 
-      // Wait for currentUser to be available
+      // 2️⃣ Wait for currentUser
       User? currentUser = FirebaseAuth.instance.currentUser;
       int waitCount = 0;
       while (currentUser == null && waitCount < 10) {
@@ -95,15 +89,21 @@ class _SignUpPageState extends State<SignUpPage> {
         throw Exception('User not logged in after sign up.');
       }
 
-      // Update username after user is ready
+      // 3️⃣ Update username
       await authService.value.updateUsername(
         username: _usernameController.text.trim(),
       );
 
+      // 4️⃣ Initialize AppState
       await localContext.read<AppState>().initialize();
 
-      if (!localContext.mounted) return;
+      // 5️⃣ If user is NOT admin, prompt for linking
+      if (selectedRole == 'user') {
+        await _promptAdminLink(localContext);
+      }
 
+      // 6️⃣ Navigate to HomePage
+      if (!localContext.mounted) return;
       Navigator.pushReplacement(
         localContext,
         MaterialPageRoute(
@@ -111,14 +111,83 @@ class _SignUpPageState extends State<SignUpPage> {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(localContext).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(localContext)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
     }
+  }
+
+  // ------------------- ADMIN LINKING DIALOG -------------------
+  Future<void> _promptAdminLink(BuildContext localContext) async {
+    final controller = TextEditingController();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    await showDialog(
+      context: localContext,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Link to Admin"),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: "Enter Admin Code",
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () async {
+              final adminCode = controller.text.trim();
+              if (adminCode.isEmpty) return;
+
+              try {
+                final dbRef = FirebaseDatabase.instance.ref();
+                final adminsSnap = await dbRef.child('admins').get();
+
+                String? matchedAdminId;
+
+                for (final admin in adminsSnap.children) {
+                  final codeSnap = admin.child('admincode');
+                  if (codeSnap.exists && codeSnap.value == adminCode) {
+                    matchedAdminId = admin.key;
+                    break;
+                  }
+                }
+
+                if (matchedAdminId != null) {
+                  await dbRef.child('users/${user.uid}').update({
+                    'linkedAdminId': matchedAdminId,
+                  });
+
+                  // Update AppState
+                  localContext.read<AppState>().setAdminId(matchedAdminId);
+
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+
+                  ScaffoldMessenger.of(localContext).showSnackBar(
+                    const SnackBar(content: Text('Successfully linked to admin!')),
+                  );
+                } else {
+                  ScaffoldMessenger.of(localContext).showSnackBar(
+                    const SnackBar(content: Text('Invalid admin code')),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(localContext).showSnackBar(
+                  const SnackBar(content: Text('Error linking to admin')),
+                );
+              }
+            },
+            child: const Text("Link"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -129,7 +198,7 @@ class _SignUpPageState extends State<SignUpPage> {
         backgroundColor: myColors.primary,
         iconTheme: IconThemeData(color: myColors.secondary),
       ),
-      resizeToAvoidBottomInset: true,  // adjust layout for keyboard
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
@@ -145,89 +214,58 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
               ),
               const SizedBox(height: 20),
-              // Email TextField
               TextField(
                 controller: _emailController,
-                style: TextStyle(
-                  color: myColors.secondary,
-                  backgroundColor: myColors.primary,
-                ),
+                style: TextStyle(color: myColors.secondary),
                 decoration: InputDecoration(
                   labelText: 'Email',
                   labelStyle: TextStyle(color: myColors.secondary),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8.0),
-                    borderSide: BorderSide(
-                      color: myColors.secondary,
-                      width: 2,
-                    ),
+                    borderSide: BorderSide(color: myColors.secondary, width: 2),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8.0),
-                    borderSide: BorderSide(
-                      color: myColors.secondary,
-                      width: 2,
-                    ),
+                    borderSide: BorderSide(color: myColors.secondary, width: 2),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
-              // Password TextField
               TextField(
                 controller: _passwordController,
-                style: TextStyle(
-                  color: myColors.secondary,
-                  backgroundColor: myColors.primary,
-                ),
+                obscureText: true,
+                style: TextStyle(color: myColors.secondary),
                 decoration: InputDecoration(
                   labelText: 'Password',
                   labelStyle: TextStyle(color: myColors.secondary),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8.0),
-                    borderSide: BorderSide(
-                      color: myColors.secondary,
-                      width: 2,
-                    ),
+                    borderSide: BorderSide(color: myColors.secondary, width: 2),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8.0),
-                    borderSide: BorderSide(
-                      color: myColors.secondary,
-                      width: 2,
-                    ),
+                    borderSide: BorderSide(color: myColors.secondary, width: 2),
                   ),
                 ),
-                obscureText: true,
               ),
               const SizedBox(height: 20),
-              // Username TextField
               TextField(
                 controller: _usernameController,
-                style: TextStyle(
-                  color: myColors.secondary,
-                  backgroundColor: myColors.primary,
-                ),
+                style: TextStyle(color: myColors.secondary),
                 decoration: InputDecoration(
                   labelText: 'Username',
                   labelStyle: TextStyle(color: myColors.secondary),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8.0),
-                    borderSide: BorderSide(
-                      color: myColors.secondary,
-                      width: 2,
-                    ),
+                    borderSide: BorderSide(color: myColors.secondary, width: 2),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8.0),
-                    borderSide: BorderSide(
-                      color: myColors.secondary,
-                      width: 2,
-                    ),
+                    borderSide: BorderSide(color: myColors.secondary, width: 2),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
-              // Role selector row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -235,18 +273,15 @@ class _SignUpPageState extends State<SignUpPage> {
                   _buildRoleButton('Admin', 1),
                 ],
               ),
-              const SizedBox(height: 10),
-              Container(
-                margin: const EdgeInsets.only(top: 20, bottom: 20),
-                child: isLoading
-                    ? const CircularProgressIndicator()
-                    : PrimaryButton(
-                        label: 'Sign Up',
-                        color: myColors.secondary,
-                        color2: myColors.primary,
-                        onPressed: _signUp,
-                      ),
-              ),
+              const SizedBox(height: 20),
+              isLoading
+                  ? const CircularProgressIndicator()
+                  : PrimaryButton(
+                      label: 'Sign Up',
+                      color: myColors.secondary,
+                      color2: myColors.primary,
+                      onPressed: _signUp,
+                    ),
             ],
           ),
         ),

@@ -66,19 +66,6 @@ class AppState extends ChangeNotifier {
       } else {
         _adminId = userData['linkedAdminId'] as String?;
       }
-
-        // if (linkedCode != null) {
-        //   final adminsSnap = await FirebaseDatabase.instance.ref('admins').get();
-        //   if (adminsSnap.exists) {
-        //     for (final adminEntry in adminsSnap.children) {
-        //       final codeSnap = adminEntry.child('admincode');
-        //       if (codeSnap.exists && codeSnap.value == linkedCode) {
-        //         _adminId = adminEntry.key;
-        //         break;
-        //       }
-        //     }
-        //   }
-        // }
     } catch (e) {
       debugPrint('Error initializing AppState: $e');
       reset();
@@ -88,3 +75,44 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 }
+
+
+// {
+//   "rules": {
+//     "admins": {
+//       "$adminId": {
+//         ".read": "auth != null && (auth.uid === $adminId || root.child('users').child(auth.uid).child('linkedAdminId').val() === $adminId)",
+//         ".write": "auth != null && auth.uid === $adminId",
+
+//         "teams": {
+//           "$teamId": {
+//             ".read": "auth != null && (auth.uid === $adminId || root.child('users').child(auth.uid).child('linkedAdminId').val() === $adminId)",
+//             ".write": "auth != null && auth.uid === $adminId"
+//           }
+//         },
+
+//         "repairs": {
+//           "$repairId": {
+//             ".read": "auth != null && (auth.uid === $adminId || root.child('users').child(auth.uid).child('linkedAdminId').val() === $adminId)",
+//             ".write": "auth != null && (auth.uid === $adminId || root.child('users').child(auth.uid).child('linkedAdminId').val() === $adminId)"
+//           }
+//         }
+//       }
+//     },
+
+//     "users": {
+//       "$userId": {
+//         ".read": "auth != null && (auth.uid === $userId || root.child('users').child($userId).child('linkedAdminId').val() === auth.uid)",
+//         ".write": "auth != null && auth.uid === $userId"
+//       },
+//       ".indexOn": ["linkedAdminId"]
+//     },
+
+//     "adminCodes": {
+//       "$code": {
+//         ".read": "auth != null",
+//         ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+//       }
+//     }
+//   }
+// }

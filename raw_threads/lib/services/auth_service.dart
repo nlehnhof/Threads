@@ -9,43 +9,60 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final DatabaseReference _dbRef = FirebaseDatabase.instance.ref();
 
-  // Create a new user and store their email and role
   Future<void> createAccount({
     required String email,
     required String password,
-    required String role,
-    String? adminId,
+    required String role,       // 'admin' or 'user'
+    String? adminCode,           // optional for users to link to admin
   }) async {
     try {
+      // 1. Create user in Firebase Auth
       UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
       User? user = result.user;
+      if (user == null) throw Exception("Failed to create Firebase user.");
 
-      if (user != null) {
-        final userData = {
-          'id': user.uid,
-          'email': email,
-          'role': role,
-          'username': '',
-        };
-        if (role == 'user' && adminId != null) {
-          userData['adminId'] = adminId;
-        }
-        await _dbRef.child('users').child(user.uid).set(userData);
+      // 2. Prepare user data for database
+      final userData = {
+        'id': user.uid,
+        'email': email,
+        'role': role,
+        'username': '',
+      };
 
-        if (role == 'admin') {
-          await _dbRef.child('admins').child(user.uid).set({
-            'dances': {},
-            'shows': {},
-            'costumes': {},
-            'repairs': {},
-            'costumeItems': {},
-            'issueItems': {},
-          });
-        }
+      // 3. Handle regular users: link to admin if adminCode provided
+      if (role == 'user' && adminCode != null) {
+        // Look up adminId from adminCodes
+        final snapshot = await _dbRef.child('adminCodes').child(adminCode).get();
+        if (!snapshot.exists) throw Exception("Invalid admin code.");
+        final linkedAdminId = snapshot.value as String;
+        userData['adminId'] = linkedAdminId;
+      }
+
+      // 4. Save user data
+      await _dbRef.child('users').child(user.uid).set(userData);
+
+      // 5. Handle admins
+      if (role == 'admin') {
+        // Generate adminCode: first 6 characters of UID
+        final adminCodeGenerated = user.uid.substring(0, 6);
+
+        // Save admin data under admins
+        await _dbRef.child('admins').child(user.uid).set({
+          'admincode': adminCodeGenerated,
+          'dances': {},
+          'shows': {},
+          'costumes': {},
+          'repairs': {},
+          'costumeItems': {},
+          'issueItems': {},
+        });
+
+        // Save adminCode -> adminId mapping
+        await _dbRef.child('adminCodes').child(adminCodeGenerated).set(user.uid);
       }
     } catch (e) {
       rethrow;
@@ -82,10 +99,33 @@ class AuthService {
   Future<String?> getLinkedAdminId() async {
     final user = _auth.currentUser;
     if (user == null) return null;
-    final snapshot = await _dbRef.child('users').child(user.uid).child('adminId').get();
-    if (snapshot.exists) {
-      return snapshot.value as String?;
+
+    final userSnapshot = await _dbRef.child('users').child(user.uid).get();
+    if (!userSnapshot.exists) return null;
+
+    final data = Map<String, dynamic>.from(userSnapshot.value as Map);
+
+    // 1. If user already has adminId, return it
+    if (data.containsKey('adminId')) {
+      return data['adminId'] as String;
     }
+
+    // 2. Otherwise, check if they provided an adminCode
+    if (data.containsKey('adminCode')) {
+      final adminCode = data['adminCode'] as String;
+      final snapshot = await _dbRef.child('adminCodes').child(adminCode).get();
+      if (snapshot.exists) {
+        final linkedAdminId = snapshot.value as String;
+
+        // Save the resolved adminId for future use
+        await _dbRef.child('users').child(user.uid).update({
+          'adminId': linkedAdminId,
+        });
+
+        return linkedAdminId;
+      }
+    }
+
     return null;
   }
 
@@ -109,6 +149,24 @@ class AuthService {
       debugPrint("Error fetching shows: $e");
       return {};
     }
+  }
+
+  Future<List<AppUser>> getUsersForAdmin(String adminId) async {
+    final snapshot = await _dbRef.child('users')
+        .orderByChild('adminId')
+        .equalTo(adminId)
+        .get();
+
+    if (!snapshot.exists) return [];
+
+    final users = <AppUser>[];
+    snapshot.children.forEach((child) {
+      final data = Map<String, dynamic>.from(child.value as Map);
+      data['id'] = child.key!;
+      users.add(AppUser.fromJson(data));
+    });
+
+    return users;
   }
 
   Future<Map<String, dynamic>> getDancesForAdmin(String adminId) async {

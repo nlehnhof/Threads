@@ -12,11 +12,7 @@ class AssignPage extends StatefulWidget {
   final CostumePiece costume;
   final String role;
 
-  const AssignPage({
-    super.key,
-    required this.costume,
-    required this.role,
-  });
+  const AssignPage({super.key, required this.costume, required this.role});
 
   @override
   State<AssignPage> createState() => _AssignPageState();
@@ -24,57 +20,47 @@ class AssignPage extends StatefulWidget {
 
 class _AssignPageState extends State<AssignPage> {
   String searchQuery = "";
-  bool sortByUser = true;
+  bool _loading = true;
   bool get isAdmin => widget.role == 'admin';
 
   String danceId = "";
   String gender = "";
-  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadPathAndUpdateContext();
+    _initializeProviders();
   }
 
-  Future<void> _loadPathAndUpdateContext() async {
+  Future<void> _initializeProviders() async {
     final costumeProvider = context.read<CostumesProvider>();
+    final assignmentProvider = context.read<AssignmentProvider>();
     final adminId = context.read<AppState>().adminId;
     if (adminId == null) return;
-    final path = await costumeProvider.findCostumePath(widget.costume.id, adminId);
 
-    if (path != null) {
-      danceId = path['danceId'] ?? '';
-      gender = path['gender'] ?? '';
-
-      if (mounted) {
-        final assignmentProvider = context.read<AssignmentProvider>();
-        assignmentProvider.setContext(
-          danceId: danceId,
-          gender: gender,
-          costumeId: widget.costume.id,
-        );
-      }
-    } else {
+    // Find the costume path
+    final path = await costumeProvider.findCostumePath(widget.costume.id);
+    if (path == null) {
+      if (mounted) setState(() => _loading = false);
       print("❌ Could not find path for costume ${widget.costume.id}");
-      danceId = '';
-      gender = '';
-    }
-
-    if (mounted) {
-      setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _addOrEditAssignment({Assignments? existing, int? index}) async {
-    if (danceId.isEmpty || gender.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Dance and gender not loaded yet")),
-      );
       return;
     }
 
-    final provider = context.read<AssignmentProvider>();
+    danceId = path['danceId'] ?? '';
+    gender = path['gender'] ?? '';
+
+    // Set AssignmentProvider context
+    await assignmentProvider.setContext(
+      danceId: danceId,
+      gender: gender,
+      costumeId: widget.costume.id,
+    );
+
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _addOrEditAssignment({Assignments? existing}) async {
+    final assignmentProvider = context.read<AssignmentProvider>();
 
     final result = await showDialog<Assignments?>(
       context: context,
@@ -82,23 +68,17 @@ class _AssignPageState extends State<AssignPage> {
         allowDelete: existing != null,
         existing: existing,
         costume: widget.costume,
-        onSave: (assignment) => Navigator.of(context).pop(assignment),
+        onSave: (assignment) => Navigator.pop(context, assignment),
       ),
     );
 
     if (result == null && existing != null) {
-      if (mounted) {
-      await provider.deleteAssignment(existing.id);
-      }
+      await assignmentProvider.deleteAssignment(existing.id);
     } else if (result != null) {
       if (existing != null) {
-        if (mounted) {
-        await provider.updateAssignment(result);
-        }
+        await assignmentProvider.updateAssignment(result);
       } else {
-        if (mounted) {
-        await provider.addAssignment(result);
-        }
+        await assignmentProvider.addAssignment(result);
       }
     }
   }
@@ -106,41 +86,20 @@ class _AssignPageState extends State<AssignPage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    if (danceId.isEmpty || gender.isEmpty) {
-      return Scaffold(
-        backgroundColor: myColors.secondary,
-        appBar: AppBar(
-          title: Text(
-            "Assignments",
-          style: TextStyle(
-            fontFamily: 'Vogun',
-            color: Colors.black87,
-            fontSize: 22,
-            ),
-          ),
-        ),
-        body: const Center(
-          child: Text("Could not find dance/gender for this costume."),
-        ),
-      );
-    }
+    final assignmentProvider = context.watch<AssignmentProvider>();
+    final assignments = assignmentProvider.assignments;
 
-    final provider = context.watch<AssignmentProvider>();
-    final assignments = provider.assignments;
-
-    // Filter assignments by user search query (case-insensitive)
     List<Assignments> filtered = assignments
         .where((a) => a.user.toLowerCase().contains(searchQuery.toLowerCase()))
-        .toList();
-
-    if (sortByUser) {
-      filtered.sort((a, b) => a.user.toLowerCase().compareTo(b.user.toLowerCase()));
-    }
+        .toList()
+      ..sort((a, b) {
+        final numA = int.tryParse(a.number) ?? 0;
+        final numB = int.tryParse(b.number) ?? 0;
+        return numA.compareTo(numB);
+      });
 
     return Scaffold(
       backgroundColor: myColors.secondary,
@@ -148,7 +107,7 @@ class _AssignPageState extends State<AssignPage> {
         backgroundColor: myColors.secondary,
         title: Text(
           '${widget.costume.title} Assignments',
-          style: TextStyle(
+          style: const TextStyle(
             fontFamily: 'Vogun',
             color: Colors.black87,
             fontSize: 22,
@@ -166,66 +125,56 @@ class _AssignPageState extends State<AssignPage> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-            child: Column(
-              children: [
-                Material(
-                  elevation: 3,
-                  borderRadius: BorderRadius.circular(16),
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: "Search",
-                      prefixIcon: const Icon(Icons.search),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                      ),
-                    onChanged: (value) => setState(() => searchQuery = value),
+            padding: const EdgeInsets.all(4.0),
+            child: Material(
+              elevation: 3,
+              borderRadius: BorderRadius.circular(16),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: "Search",
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
                   ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                 ),
-              ],
+                onChanged: (value) => setState(() => searchQuery = value),
+              ),
             ),
           ),
           Expanded(
             child: ListView.builder(
               itemCount: filtered.length,
-              itemBuilder: (context, index) {
+              itemBuilder: (_, index) {
                 final assignment = filtered[index];
-                return Column(
-                  children: [
-                    InkWell(
-                      onTap: isAdmin
-                        ? () => _addOrEditAssignment(existing: assignment, index: index)
-                        : null,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${assignment.number} ${assignment.size}',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
+                return InkWell(
+                  onTap: isAdmin ? () => _addOrEditAssignment(existing: assignment) : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${assignment.number} ${assignment.size}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
                           ),
-                          Text(
-                            assignment.user,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey,
-                            ),
+                        ),
+                        Text(
+                          assignment.user,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    ),
-                  ],
+                  ),
                 );
               },
             ),

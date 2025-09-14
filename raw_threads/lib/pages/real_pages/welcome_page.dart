@@ -66,6 +66,7 @@ class WelcomePage extends StatelessWidget {
                       label: 'Sign Up',
                       color: Color(0xFF6A8071),
                       color2: Colors.white,
+                      border: Colors.white,
                       onPressed: () {
                         Navigator.push(
                           context,

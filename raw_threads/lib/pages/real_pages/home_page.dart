@@ -36,18 +36,20 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _initUserData() async {
-    debugPrint('HomePage: Starting _initUserData');
     if (_initialized) return;
     _initialized = true;
+
     final currentUser = FirebaseAuth.instance.currentUser;
-    final danceProvider = context.read<DanceInventoryProvider>();
     if (currentUser == null) {
       setState(() => _loading = false);
       return;
     }
 
     final appState = context.read<AppState>();
+    final danceProvider = context.read<DanceInventoryProvider>();
+    final showsProvider = context.read<ShowsProvider>();
 
+    // Admin or regular user setup
     if (isAdmin) {
       debugPrint('User is admin, setting adminId to ${currentUser.uid}');
       appState.setAdminId(currentUser.uid);
@@ -73,8 +75,9 @@ class _HomePageState extends State<HomePage> {
     final adminId = appState.adminId;
     if (adminId != null) {
       try {
-        await context.read<ShowsProvider>().init(danceProvider);
-        await context.read<DanceInventoryProvider>().init();
+        // Initialize danceProvider only once
+        await danceProvider.init();
+        await showsProvider.init(danceProvider);
       } catch (e) {
         debugPrint('Error initializing providers: $e');
       }
@@ -120,7 +123,6 @@ class _HomePageState extends State<HomePage> {
                   return;
                 }
 
-                // final adminsMap = Map<String, dynamic>.from(adminsSnapshot.value as Map);
                 String? matchedAdminId;
                 for (final adminEntry in adminsSnapshot.children) {
                   final codeSnap = adminEntry.child('admincode');
@@ -143,8 +145,8 @@ class _HomePageState extends State<HomePage> {
 
                   // Initialize providers
                   final danceProvider = context.read<DanceInventoryProvider>();
+                  await danceProvider.init();
                   await context.read<ShowsProvider>().init(danceProvider);
-                  await context.read<DanceInventoryProvider>().init();
 
                   if (mounted) setState(() {});
                 } else {
@@ -225,12 +227,7 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    final danceProvider = context.watch<DanceInventoryProvider?>();
-    if (danceProvider == null) {
-      return const Scaffold(
-        body: Center(child: Text('Please link your account to an admin.')),
-      );
-    }
+    final danceProvider = context.watch<DanceInventoryProvider>();
     final showsProvider = context.watch<ShowsProvider>();
 
     return Scaffold(

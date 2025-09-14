@@ -12,6 +12,9 @@ class MemberProfile extends StatelessWidget {
     return Scaffold(
       backgroundColor: myColors.secondary,
       appBar: AppBar(
+        iconTheme: IconThemeData(
+          color: myColors.secondary, // <-- sets back button color
+        ),
         backgroundColor: myColors.primary,
         title: Text(
           'Member Profile',

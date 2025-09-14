@@ -99,7 +99,7 @@ class MyApp extends StatelessWidget {
               },
             ),
             ChangeNotifierProvider<TeamProvider>(
-              create: (_) => TeamProvider(adminId: adminId)..init(),
+              create: (_) => TeamProvider()..init(),
             ),
             ChangeNotifierProvider<AssignmentProvider>(
               create: (_) => AssignmentProvider(adminId: adminId),

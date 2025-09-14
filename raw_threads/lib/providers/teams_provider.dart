@@ -1,208 +1,193 @@
-import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:raw_threads/classes/main_classes/teams.dart';
+import 'package:raw_threads/classes/main_classes/app_user.dart';
+import 'package:raw_threads/classes/main_classes/shows.dart';
+import 'package:raw_threads/classes/main_classes/dances.dart';
 
 class TeamProvider extends ChangeNotifier {
-  final DatabaseReference _db = FirebaseDatabase.instance.ref();
-  final String adminId;
+  final DatabaseReference _dbRef = FirebaseDatabase.instance.ref();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  String adminCode = '';
-  List<Teams> teams = [];
-  List<Map<String, dynamic>> unassignedUsers = [];
-  String role = 'user';
   bool isLoading = true;
+
+  List<Teams> teams = [];
+  List<AppUser> linkedUsers = [];
+  String adminCode = '';
   String? assignedTeamId;
 
-  Map<String, String> usernames = {};
-  DatabaseReference? _teamsRef;
-  Query? _usersRef;
-  StreamSubscription<DatabaseEvent>? _teamsSub;
-  StreamSubscription<DatabaseEvent>? _usersSub;
+  TeamProvider();
 
-  TeamProvider({required this.adminId});
-
-  /// Initialize provider
   Future<void> init() async {
     isLoading = true;
     notifyListeners();
 
-    final currentUser = FirebaseAuth.instance.currentUser;
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) return;
+
+      // Step 1: Get user role
+      final roleSnap = await _dbRef.child('users/${currentUser.uid}/role').get();
+      final role = roleSnap.exists ? roleSnap.value as String : 'user';
+
+      String? adminId;
+      if (role == 'admin') {
+        adminId = currentUser.uid;
+      } else {
+        // Regular user linked to admin
+        final linkSnap = await _dbRef.child('users/${currentUser.uid}/linkedAdminId').get();
+        adminId = linkSnap.exists ? linkSnap.value as String : null;
+
+        // Store assigned team for user
+        final teamSnap = await _dbRef.child('users/${currentUser.uid}/assignedTeamId').get();
+        assignedTeamId = teamSnap.exists ? teamSnap.value as String : null;
+      }
+
+      if (adminId != null) {
+        // Admin code
+        final codeSnap = await _dbRef.child('admins/$adminId/admincode').get();
+        adminCode = codeSnap.exists ? codeSnap.value as String : adminId.substring(0, 6);
+
+        // Load teams
+        final teamsSnap = await _dbRef.child('admins/$adminId/teams').get();
+        teams = [];
+        if (teamsSnap.exists && teamsSnap.value != null) {
+          (teamsSnap.value as Map).forEach((key, value) {
+            teams.add(Teams.fromJson({'id': key, ...Map<String, dynamic>.from(value)}));
+          });
+        }
+
+        // --- Load linked users by scanning all users where linkedAdminId == adminId ---
+        final usersSnap = await _dbRef.child('users').get();
+        linkedUsers = [];
+        if (usersSnap.exists && usersSnap.value != null) {
+          for (final userSnap in usersSnap.children) {
+            final userMap = userSnap.value as Map<dynamic, dynamic>;
+            if (userMap['linkedAdminId'] == adminId) {
+              linkedUsers.add(AppUser.fromJson({'id': userSnap.key, ...Map<String, dynamic>.from(userMap)}));
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('TeamProvider init error: $e');
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Get username for user ID
+  String usernameFor(String uid) {
+    final user = linkedUsers.firstWhere(
+      (u) => u.id == uid,
+      orElse: () => AppUser(id: uid, email: '', username: 'Unknown', role: 'user'),
+    );
+    return user.username;
+  }
+
+  // --- Team Management ---
+  Future<void> addTeam(String title) async {
+    final currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
-    // Load admin code and user role
-    await _loadAdminCode();
-    await _loadCurrentUserRole(currentUser.uid);
-
-    // Listen to teams and users in real-time
-    _listenToTeams();
-    _listenToUsernames();
-
-    isLoading = false;
-    notifyListeners();
-  }
-
-  /// Load admin code once
-  Future<void> _loadAdminCode() async {
-    final snap = await _db.child('admins/$adminId/admincode').get();
-    if (snap.exists && snap.value != null) {
-      adminCode = snap.value as String;
-    }
-  }
-
-  /// Load current user's role
-  Future<void> _loadCurrentUserRole(String userId) async {
-    final snap = await _db.child('users/$userId').get();
-    if (snap.exists && snap.value != null) {
-      role = (snap.value as Map)['role'] ?? 'user';
-    }
-  }
-
-  /// Listen to teams in real-time
-  void _listenToTeams() {
-    _teamsRef = _db.child('admins/$adminId/teams');
-    _teamsSub?.cancel();
-
-    _teamsSub = _teamsRef!.onValue.listen((event) {
-      final snapshot = event.snapshot;
-      if (snapshot.exists && snapshot.value != null) {
-        final data = Map<String, dynamic>.from(snapshot.value as Map);
-        teams = data.entries
-            .map((e) => Teams.fromJson(Map<String, dynamic>.from(e.value)))
-            .toList();
-      } else {
-        teams = [];
-      }
-      _assignUsers(FirebaseAuth.instance.currentUser!.uid);
-      notifyListeners();
-    });
-  }
-
-  /// Listen to usernames of linked users in real-time
-  void _listenToUsernames() {
-    _usersRef = _db.child('users').orderByChild('linkedAdminId').equalTo(adminId);
-    _usersSub?.cancel();
-
-    _usersSub = _usersRef!.onValue.listen((event) {
-      final snapshot = event.snapshot;
-      if (!snapshot.exists || snapshot.value == null) {
-        usernames.clear();
-      } else {
-        final Map<String, dynamic> data = Map<String, dynamic>.from(snapshot.value as Map);
-        usernames = data.map((uid, value) {
-          final user = Map<String, dynamic>.from(value);
-          return MapEntry(uid, user['username'] ?? 'Unknown');
-        });
-      }
-      _assignUsers(FirebaseAuth.instance.currentUser!.uid);
-      notifyListeners();
-    });
-  }
-
-  /// Assign unassigned users and set current user's team
-  void _assignUsers(String currentUserId) {
-    unassignedUsers.clear();
-    assignedTeamId = null;
-
-    for (var entry in usernames.entries) {
-      final uid = entry.key;
-      final team = teams.firstWhere(
-        (t) => t.members.contains(uid),
-        orElse: () => Teams(id: '', title: '', members: [], assigned: []),
-      );
-
-      if (team.id.isEmpty) {
-        unassignedUsers.add({'uid': uid, 'username': entry.value});
-      } else if (uid == currentUserId) {
-        assignedTeamId = team.id;
-      }
-    }
-  }
-
-  // --- Team CRUD ---
-  Future<void> addTeam(String title) async {
-    final teamId = _db.child('admins/$adminId/teams').push().key!;
-    final newTeam = Teams(id: teamId, title: title, members: [], assigned: []);
-    await _db.child('admins/$adminId/teams/$teamId').set(newTeam.toJson());
+    final teamRef = _dbRef.child('admins/${currentUser.uid}/teams').push();
+    final newTeam = Teams(id: teamRef.key!, title: title, members: [], assigned: []);
+    await teamRef.set(newTeam.toJson());
+    teams.add(newTeam);
     notifyListeners();
   }
 
   Future<void> renameTeam(String teamId, String newTitle) async {
-    await _db.child('admins/$adminId/teams/$teamId/title').set(newTitle);
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    await _dbRef.child('admins/${currentUser.uid}/teams/$teamId/title').set(newTitle);
+    final team = teams.firstWhere((t) => t.id == teamId);
+    team.title = newTitle;
+    notifyListeners();
   }
 
   Future<void> deleteTeam(String teamId) async {
-    await _db.child('admins/$adminId/teams/$teamId').remove();
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    await _dbRef.child('admins/${currentUser.uid}/teams/$teamId').remove();
+    teams.removeWhere((t) => t.id == teamId);
+    notifyListeners();
   }
 
-  // --- User management ---
-  Future<void> assignUserToTeam(String userId, String teamId) async {
-    for (var t in teams) {
-      if (t.members.contains(userId)) {
-        t.members.remove(userId);
-        await _db.child('admins/$adminId/teams/${t.id}/members').set(t.members);
-      }
-    }
+  // --- User Assignment ---
+  Future<void> assignUserToTeam(String uid, String teamId) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
 
     final team = teams.firstWhere((t) => t.id == teamId);
-    team.members.add(userId);
-    await _db.child('admins/$adminId/teams/$teamId/members').set(team.members);
-  }
+    if (!team.members.contains(uid)) team.members.add(uid);
 
-  Future<void> unlinkUser(String userId) async {
-    // Clear user’s linked admin info
-    await _db.child('users/$userId/linkedAdminId').remove();
-    await _db.child('users/$userId/admincode').remove();
-
-    // Remove from local unassigned list
-    unassignedUsers.removeWhere((u) => u['uid'] == userId);
+    await _dbRef.child('admins/${currentUser.uid}/teams/$teamId/members').set(team.members);
+    await _dbRef.child('users/$uid/assignedTeamId').set(teamId);
 
     notifyListeners();
   }
 
-  Future<void> removeUserFromTeam(String userId, String teamId) async {
-    final teamIndex = teams.indexWhere((t) => t.id == teamId);
-    if (teamIndex == -1) return;
+  Future<void> removeUserFromTeam(String uid, String teamId) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
 
-    final team = teams[teamIndex];
-    if (team.members.contains(userId)) {
-      team.members.remove(userId);
-      await _db.child('admins/$adminId/teams/$teamId/members').set(team.members);
-      notifyListeners();
-    }
+    final team = teams.firstWhere((t) => t.id == teamId);
+    team.members.remove(uid);
+
+    await _dbRef.child('admins/${currentUser.uid}/teams/$teamId/members').set(team.members);
+    await _dbRef.child('users/$uid/assignedTeamId').remove();
+
+    notifyListeners();
   }
 
-  // --- Dance assignment ---
+  // --- Dance Assignment ---
   Future<void> assignDanceToTeam(String teamId, String danceId) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
     final team = teams.firstWhere((t) => t.id == teamId);
-    if (!team.assigned.contains(danceId)) {
-      team.assigned.add(danceId);
-      await _db.child('admins/$adminId/teams/$teamId/assigned').set(team.assigned);
-      notifyListeners();
-    }
+    if (!team.assigned.contains(danceId)) team.assigned.add(danceId);
+
+    await _dbRef.child('admins/${currentUser.uid}/teams/$teamId/assigned').set(team.assigned);
+    notifyListeners();
   }
 
   Future<void> unassignDanceFromTeam(String teamId, String danceId) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
     final team = teams.firstWhere((t) => t.id == teamId);
-    if (team.assigned.contains(danceId)) {
-      team.assigned.remove(danceId);
-      await _db.child('admins/$adminId/teams/$teamId/assigned').set(team.assigned);
-      notifyListeners();
-    }
+    team.assigned.remove(danceId);
+
+    await _dbRef.child('admins/${currentUser.uid}/teams/$teamId/assigned').set(team.assigned);
+    notifyListeners();
+  }
+
+  // --- Helper Getters ---
+  List<String> getDanceIdsForTeam(String teamId) {
+    final team = teams.firstWhere(
+      (t) => t.id == teamId,
+      orElse: () => Teams(id: '', title: '', members: [], assigned: []),
+    );
+    return team.assigned;
+  }
+
+  List<Dances> getDancesForTeam(String teamId, List<Dances> allDances) {
+    final danceIds = getDanceIdsForTeam(teamId);
+    return allDances.where((d) => danceIds.contains(d.id)).toList();
+  }
+
+  List<Shows> getShowsForTeam(String teamId, List<Shows> allShows) {
+    final danceIds = getDanceIdsForTeam(teamId);
+    return allShows.where((s) => s.danceIds.any((id) => danceIds.contains(id))).toList();
   }
 
   List<String> getTeamNamesForDance(String danceId) {
-    final teamsWithDance = teams.where((t) => t.assigned.contains(danceId));
-    return teamsWithDance.map((t) => t.title).toList();
-  }
-
-  String usernameFor(String uid) => usernames[uid] ?? 'Unknown';
-
-  @override
-  void dispose() {
-    _teamsSub?.cancel();
-    _usersSub?.cancel();
-    super.dispose();
+    return teams.where((t) => t.assigned.contains(danceId)).map((t) => t.title).toList();
   }
 }

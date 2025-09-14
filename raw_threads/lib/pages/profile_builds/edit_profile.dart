@@ -127,6 +127,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
     return Scaffold(
       backgroundColor: myColors.secondary,
       appBar: AppBar(
+        iconTheme: IconThemeData(
+          color: myColors.secondary, // <-- sets back button color
+        ),
         title: Text(
           'Edit Profile',
           style: TextStyle(

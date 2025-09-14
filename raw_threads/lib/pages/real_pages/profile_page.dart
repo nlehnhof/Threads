@@ -6,6 +6,7 @@ import 'package:raw_threads/pages/profile_builds/edit_profile.dart';
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+import 'package:raw_threads/classes/style_classes/my_colors.dart';
 
 class ProfilePage extends StatefulWidget {
   final String role;
@@ -60,6 +61,9 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       backgroundColor: myColors.secondary,
       appBar: AppBar(
+        iconTheme: IconThemeData(
+          color: myColors.secondary, // <-- sets back button color
+        ),
         backgroundColor: myColors.primary,
         title: Text('Profile', style: TextStyle(fontFamily: 'Vogun', fontSize: 28, color: myColors.secondary)),
         centerTitle: true,

@@ -19,17 +19,13 @@ class CostumesProvider extends ChangeNotifier {
 
   CostumesProvider({required this.adminId});
 
-  /// Initialize with danceId and gender (can be called multiple times
-  /// to switch the context to a new dance/gender).
+  /// Initialize with danceId and gender
   Future<void> init({required String danceId, required String gender}) async {
-    if (_initialized && _currentDanceId == danceId && _currentGender == gender) return; 
-    
-    _initialized = false;
-    notifyListeners();
+    if (_initialized && _currentDanceId == danceId && _currentGender == gender) return;
 
     await setDanceAndGender(danceId, gender);
 
-    _initialized = true;
+    _initialized = true; // set initialized only after listener is ready
     notifyListeners();
   }
 
@@ -45,20 +41,20 @@ class CostumesProvider extends ChangeNotifier {
     await _costumesSubscription?.cancel();
 
     _costumes.clear();
-    notifyListeners();
+    notifyListeners(); // optional: notify immediately for UI reset
 
-    _costumesSubscription = FirebaseDatabase.instance
-        .ref('admins/$adminId/dances/$danceId/costumes/$gender')
-        .onValue
-        .listen((event) {
-      final data = event.snapshot.value;
+    final ref = FirebaseDatabase.instance
+        .ref('admins/$adminId/dances/$danceId/costumes/$gender');
+
+    _costumesSubscription = ref.onValue.listen((event) {
       _costumes.clear();
 
+      final data = event.snapshot.value;
       if (data != null && data is Map) {
         data.forEach((key, value) {
           try {
             final map = Map<String, dynamic>.from(value);
-            map['id'] = key; // ensure ID persists
+            map['id'] = key;
             final costume = CostumePiece.fromJson(map);
             _costumes.add(costume);
           } catch (e) {
@@ -68,42 +64,41 @@ class CostumesProvider extends ChangeNotifier {
           }
         });
       }
-      notifyListeners();
+
+      // Notify listeners **once per update**
+      Future.microtask(() => notifyListeners());
     });
   }
 
-  Future<Map<String, String>?> findCostumePath(String costumeId, String adminId) async {
+  /// Lookup costume by ID across all dances/genders
+  Future<Map<String, String>?> findCostumePath(String costumeId) async {
     final db = FirebaseDatabase.instance.ref('admins/$adminId/dances');
-
     final snapshot = await db.get();
-    if (!snapshot.exists) return null;
+    if (!snapshot.exists || snapshot.value == null) return null;
 
     final dancesData = snapshot.value;
-    if (dancesData == null || dancesData is! Map) return null;
+    if (dancesData is! Map) return null;
 
     for (final danceEntry in dancesData.entries) {
       final danceId = danceEntry.key;
       final danceValue = danceEntry.value;
-
       if (danceValue is Map && danceValue.containsKey('costumes')) {
         final costumesMap = danceValue['costumes'];
-
         if (costumesMap is Map) {
           for (final genderEntry in costumesMap.entries) {
             final gender = genderEntry.key;
             final genderCostumes = genderEntry.value;
-
             if (genderCostumes is Map && genderCostumes.containsKey(costumeId)) {
-              // Found the costume
               return {'danceId': danceId, 'gender': gender};
             }
           }
         }
       }
     }
-    return null; // Not found
+    return null;
   }
 
+  /// Add a new costume
   Future<void> addCostume(CostumePiece costume) async {
     if (_currentDanceId == null || _currentGender == null) {
       throw Exception('Dance ID and Gender must be set before adding costumes.');
@@ -113,10 +108,10 @@ class CostumesProvider extends ChangeNotifier {
         .ref('admins/$adminId/dances/$_currentDanceId/costumes/$_currentGender/${costume.id}');
 
     await ref.set(costume.toJson());
-    // _costumes.add(costume);
-    notifyListeners();
+    // The listener will automatically update _costumes
   }
 
+  /// Update an existing costume
   Future<void> updateCostume(CostumePiece costume) async {
     if (_currentDanceId == null || _currentGender == null) {
       throw Exception('Dance ID and Gender must be set before updating costumes.');
@@ -128,18 +123,7 @@ class CostumesProvider extends ChangeNotifier {
     await ref.set(costume.toJson());
   }
 
-  /// Get a costume by ID. Returns null if not found.
-  CostumePiece getCostumeById(String costumeId) {
-    return _costumes.firstWhere((c) => c.id == costumeId);
-  }
-
-  /// Optional helper to get just the costume name/title
-  String getCostumeNameById(String costumeId) {
-    final costume = getCostumeById(costumeId);
-    return costume.title;
-  }
-
-
+  /// Delete a costume
   Future<void> deleteCostume(String costumeId) async {
     if (_currentDanceId == null || _currentGender == null) {
       throw Exception('Dance ID and Gender must be set before deleting costumes.');
@@ -149,12 +133,17 @@ class CostumesProvider extends ChangeNotifier {
         .ref('admins/$adminId/dances/$_currentDanceId/costumes/$_currentGender/$costumeId');
 
     await ref.remove();
-
     _costumes.removeWhere((c) => c.id == costumeId);
     notifyListeners();
   }
 
-  /// Optionally provide a getter to current danceId and gender if needed
+  /// Get costume by ID in current list
+  CostumePiece? getCostumeById(String costumeId) =>
+      _costumes.firstWhereOrNull((c) => c.id == costumeId);
+
+  /// Get costume title
+  String? getCostumeNameById(String costumeId) => getCostumeById(costumeId)?.title;
+
   String? get currentDanceId => _currentDanceId;
   String? get currentGender => _currentGender;
 
@@ -162,5 +151,14 @@ class CostumesProvider extends ChangeNotifier {
   void dispose() {
     _costumesSubscription?.cancel();
     super.dispose();
+  }
+}
+
+extension FirstWhereOrNullExtension<E> on Iterable<E> {
+  E? firstWhereOrNull(bool Function(E element) test) {
+    for (final element in this) {
+      if (test(element)) return element;
+    }
+    return null;
   }
 }
