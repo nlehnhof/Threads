@@ -160,11 +160,11 @@ class AuthService {
     if (!snapshot.exists) return [];
 
     final users = <AppUser>[];
-    snapshot.children.forEach((child) {
+    for (var child in snapshot.children) {
       final data = Map<String, dynamic>.from(child.value as Map);
       data['id'] = child.key!;
       users.add(AppUser.fromJson(data));
-    });
+    }
 
     return users;
   }

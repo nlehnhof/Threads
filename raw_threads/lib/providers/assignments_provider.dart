@@ -23,7 +23,9 @@ class AssignmentProvider extends ChangeNotifier {
     // Only reload if context changes
     if (_currentDanceId == danceId &&
         _currentGender == gender &&
-        _currentCostumeId == costumeId) return;
+        _currentCostumeId == costumeId) {
+      return;
+    }
 
     _currentDanceId = danceId;
     _currentGender = gender;

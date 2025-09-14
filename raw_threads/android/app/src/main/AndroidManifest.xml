@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="raw_threads"
+        android:label="Threadline"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

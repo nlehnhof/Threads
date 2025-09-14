@@ -48,7 +48,6 @@ class MyApp extends StatelessWidget {
             home: Scaffold(
               body: Center(child: CircularProgressIndicator()),
             ),
-            debugShowCheckedModeBanner: false,
           );
         }
 
@@ -56,7 +55,7 @@ class MyApp extends StatelessWidget {
 
         // User is logged out → show WelcomePage
         if (user == null) {
-          return const MaterialApp(home: WelcomePage(), debugShowCheckedModeBanner: false,);
+          return const MaterialApp(home: WelcomePage());
         }
 
         // Initialize AppState if not yet initialized
@@ -67,7 +66,6 @@ class MyApp extends StatelessWidget {
             home: Scaffold(
               body: Center(child: CircularProgressIndicator()),
             ),
-            debugShowCheckedModeBanner: false,
           );
         }
 
@@ -77,7 +75,7 @@ class MyApp extends StatelessWidget {
 
         if (adminId == null || role == null) {
           // Initialization completed but missing data → fallback
-          return const MaterialApp(home: WelcomePage(), debugShowCheckedModeBanner: false,);
+          return const MaterialApp(home: WelcomePage());
         }
 
         // MultiProvider wraps all app data providers
@@ -113,7 +111,6 @@ class MyApp extends StatelessWidget {
           ],
           child: MaterialApp(
             navigatorObservers: [routeObserver],
-            debugShowCheckedModeBanner: false,
             title: 'Raw Threads',
             theme: ThemeData(
               primarySwatch: Colors.green,
