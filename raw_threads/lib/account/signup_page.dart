@@ -118,77 +118,75 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-  // ------------------- ADMIN LINKING DIALOG -------------------
-  Future<void> _promptAdminLink(BuildContext localContext) async {
-    final controller = TextEditingController();
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+Future<bool> _promptAdminLink(BuildContext localContext) async {
+  final controller = TextEditingController();
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return false;
 
-    await showDialog(
-      context: localContext,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Link to Admin"),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: "Enter Admin Code",
-          ),
+  bool linked = false;
+
+  await showDialog(
+    context: localContext,
+    barrierDismissible: false,
+    builder: (ctx) => AlertDialog(
+      title: const Text("Link to Admin"),
+      content: TextField(
+        controller: controller,
+        decoration: const InputDecoration(
+          hintText: "Enter Admin Code",
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () async {
-              final adminCode = controller.text.trim();
-              if (adminCode.isEmpty) return;
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            linked = false; // User cancelled
+            Navigator.of(ctx).pop();
+          },
+          child: const Text("Cancel"),
+        ),
+        TextButton(
+          onPressed: () async {
+            final adminCode = controller.text.trim();
+            if (adminCode.isEmpty) return;
 
-              try {
-                final dbRef = FirebaseDatabase.instance.ref();
-                final adminsSnap = await dbRef.child('admins').get();
+            try {
+              final dbRef = FirebaseDatabase.instance.ref();
+              final snapshot = await dbRef.child('adminCodes').child(adminCode).get();
 
-                String? matchedAdminId;
+              if (snapshot.exists) {
+                final matchedAdminId = snapshot.value as String;
+                await dbRef.child('users/${user.uid}').update({
+                  'linkedAdminId': matchedAdminId,
+                });
 
-                for (final admin in adminsSnap.children) {
-                  final codeSnap = admin.child('admincode');
-                  if (codeSnap.exists && codeSnap.value == adminCode) {
-                    matchedAdminId = admin.key;
-                    break;
-                  }
-                }
+                // Update AppState
+                localContext.read<AppState>().setAdminId(matchedAdminId);
 
-                if (matchedAdminId != null) {
-                  await dbRef.child('users/${user.uid}').update({
-                    'linkedAdminId': matchedAdminId,
-                  });
+                linked = true;
+                if (ctx.mounted) Navigator.of(ctx).pop();
 
-                  // Update AppState
-                  localContext.read<AppState>().setAdminId(matchedAdminId);
-
-                  if (ctx.mounted) Navigator.of(ctx).pop();
-
-                  ScaffoldMessenger.of(localContext).showSnackBar(
-                    const SnackBar(content: Text('Successfully linked to admin!')),
-                  );
-                } else {
-                  ScaffoldMessenger.of(localContext).showSnackBar(
-                    const SnackBar(content: Text('Invalid admin code')),
-                  );
-                }
-              } catch (e) {
                 ScaffoldMessenger.of(localContext).showSnackBar(
-                  const SnackBar(content: Text('Error linking to admin')),
+                  const SnackBar(content: Text('Successfully linked to admin!')),
+                );
+              } else {
+                ScaffoldMessenger.of(localContext).showSnackBar(
+                  const SnackBar(content: Text('Invalid admin code')),
                 );
               }
-            },
-            child: const Text("Link"),
-          ),
-        ],
-      ),
-    );
-  }
+            } catch (e) {
+              ScaffoldMessenger.of(localContext).showSnackBar(
+                const SnackBar(content: Text('Error linking to admin')),
+              );
+            }
+          },
+          child: const Text("Link"),
+        ),
+      ],
+    ),
+  );
+
+  return linked;
+}
 
   @override
   Widget build(BuildContext context) {

@@ -9,65 +9,52 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final DatabaseReference _dbRef = FirebaseDatabase.instance.ref();
 
-  Future<void> createAccount({
-    required String email,
-    required String password,
-    required String role,       // 'admin' or 'user'
-    String? adminCode,           // optional for users to link to admin
-  }) async {
-    try {
-      // 1. Create user in Firebase Auth
-      UserCredential result = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+Future<User> createAccount({
+  required String email,
+  required String password,
+  required String role, // 'admin' or 'user'
+}) async {
+  try {
+    UserCredential result = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
 
-      User? user = result.user;
-      if (user == null) throw Exception("Failed to create Firebase user.");
+    final user = result.user;
+    if (user == null) throw Exception("Failed to create Firebase user.");
 
-      // 2. Prepare user data for database
-      final userData = {
-        'id': user.uid,
-        'email': email,
-        'role': role,
-        'username': '',
-      };
+    // Prepare base user data
+    final userData = {
+      'id': user.uid,
+      'email': email,
+      'role': role,
+      'username': '',
+    };
 
-      // 3. Handle regular users: link to admin if adminCode provided
-      if (role == 'user' && adminCode != null) {
-        // Look up adminId from adminCodes
-        final snapshot = await _dbRef.child('adminCodes').child(adminCode).get();
-        if (!snapshot.exists) throw Exception("Invalid admin code.");
-        final linkedAdminId = snapshot.value as String;
-        userData['adminId'] = linkedAdminId;
-      }
+    // Save user data
+    await _dbRef.child('users').child(user.uid).set(userData);
 
-      // 4. Save user data
-      await _dbRef.child('users').child(user.uid).set(userData);
-
-      // 5. Handle admins
-      if (role == 'admin') {
-        // Generate adminCode: first 6 characters of UID
-        final adminCodeGenerated = user.uid.substring(0, 6);
-
-        // Save admin data under admins
-        await _dbRef.child('admins').child(user.uid).set({
-          'admincode': adminCodeGenerated,
-          'dances': {},
-          'shows': {},
-          'costumes': {},
-          'repairs': {},
-          'costumeItems': {},
-          'issueItems': {},
-        });
-
-        // Save adminCode -> adminId mapping
-        await _dbRef.child('adminCodes').child(adminCodeGenerated).set(user.uid);
-      }
-    } catch (e) {
-      rethrow;
+    // Handle admins immediately
+    if (role == 'admin') {
+      final adminCodeGenerated = user.uid.substring(0, 6);
+      await _dbRef.child('admins').child(user.uid).set({
+        'admincode': adminCodeGenerated,
+        'dances': {},
+        'shows': {},
+        'costumes': {},
+        'repairs': {},
+        'costumeItems': {},
+        'issueItems': {},
+      });
+      await _dbRef.child('adminCodes').child(adminCodeGenerated).set(user.uid);
     }
+
+    return user;
+  } catch (e) {
+    rethrow;
   }
+}
+
 
   Future<void> ensureAdminCodeExists() async {
     final user = _auth.currentUser;

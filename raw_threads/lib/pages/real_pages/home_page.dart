@@ -35,119 +35,125 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Future<void> _initUserData({bool forceReload = false}) async {
-    if (_initialized && !forceReload) return;
-    _initialized = true;
+Future<void> _initUserData({bool forceReload = false}) async {
+  final currentUser = FirebaseAuth.instance.currentUser;
+  if (currentUser == null) return;
 
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) return;
+  final appState = context.read<AppState>();
+  String? targetAdminId;
 
-    final appState = context.read<AppState>();
+  if (isAdmin) {
+    targetAdminId = currentUser.uid;
+  } else {
+    final userSnap =
+        await FirebaseDatabase.instance.ref('users/${currentUser.uid}').get();
+    targetAdminId = userSnap.exists &&
+            userSnap.child('linkedAdminId').value != null
+        ? userSnap.child('linkedAdminId').value as String
+        : null;
 
-    String? targetAdminId;
-    if (isAdmin) {
-      targetAdminId = currentUser.uid;
-    } else {
-      final userSnap =
-          await FirebaseDatabase.instance.ref('users/${currentUser.uid}').get();
+    if (targetAdminId == null) {
+      appState.setAdminId(null);
+      await _promptAdminLinking(); // wait until user links to admin
+      return; // providers will re-init after linking
+    }
+  }
 
-      targetAdminId = userSnap.exists &&
-              userSnap.child('linkedAdminId').value != null
-          ? userSnap.child('linkedAdminId').value as String
-          : null;
+  // Update AppState
+  appState.setAdminId(targetAdminId);
 
-      if (targetAdminId == null) {
-        appState.setAdminId(null);
-        _promptAdminLinking();
-        return; // providers will be reloaded after linking
-      }
+  // Initialize dependent providers safely
+  Future.microtask(() async {
+    if (!mounted) return;
+
+    final danceProvider = context.read<DanceInventoryProvider>();
+    if (!danceProvider.isInitialized || forceReload) {
+      await danceProvider.init();
     }
 
-    // ✅ Update AppState
-    appState.setAdminId(targetAdminId);
-
-    // ✅ Defer provider init to next microtask so context is safe
-    Future.microtask(() async {
-      if (!mounted) return;
-      final danceProvider = context.read<DanceInventoryProvider>();
-      await danceProvider.init();
-
-      final showsProvider = context.read<ShowsProvider>();
+    final showsProvider = context.read<ShowsProvider>();
+    if (!showsProvider.isInitialized || forceReload) {
       await showsProvider.init(danceProvider);
+    }
 
-      if (mounted) setState(() {});
-    });
-  }
+    if (mounted) setState(() {});
+  });
+}
 
-  Future<void> _promptAdminLinking() async {
-    final controller = TextEditingController();
+Future<void> _promptAdminLinking() async {
+  final controller = TextEditingController();
+  final currentUser = FirebaseAuth.instance.currentUser;
+  if (currentUser == null) return;
 
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Link to Admin"),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: "Enter Admin Code"),
+  await showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => AlertDialog(
+      title: const Text("Link to Admin"),
+      content: TextField(
+        controller: controller,
+        decoration: const InputDecoration(hintText: "Enter Admin Code"),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text("Cancel"),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () async {
-              final adminCode = controller.text.trim();
-              if (adminCode.isEmpty) return;
+        TextButton(
+          onPressed: () async {
+            final adminCode = controller.text.trim();
+            if (adminCode.isEmpty) return;
 
-              final currentUser = FirebaseAuth.instance.currentUser;
-              if (currentUser == null) return;
+            try {
+              final adminsSnap =
+                  await FirebaseDatabase.instance.ref('admins').get();
+              if (!adminsSnap.exists) return;
 
-              try {
-                final adminsSnapshot =
-                    await FirebaseDatabase.instance.ref('admins').get();
-
-                if (!adminsSnapshot.exists) return;
-
-                String? matchedAdminId;
-                for (final adminEntry in adminsSnapshot.children) {
-                  final codeSnap = adminEntry.child('admincode');
-                  if (codeSnap.exists && codeSnap.value == adminCode) {
-                    matchedAdminId = adminEntry.key;
-                    break;
-                  }
-                }
-
-                if (matchedAdminId != null) {
-                  await FirebaseDatabase.instance
-                      .ref('users/${currentUser.uid}')
-                      .update({'linkedAdminId': matchedAdminId});
-
-                  if (mounted) Navigator.of(ctx).pop();
-
-                  // 🔑 Just reload user data → providers will re-init inside it
-                  await _initUserData(forceReload: true);
-                } else {
-                  if (mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(content: Text('Invalid Admin Code')));
-                  }
-                }
-              } catch (e) {
-                debugPrint('Error linking admin: $e');
-                if (mounted) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(content: Text('Error linking to admin')));
+              String? matchedAdminId;
+              for (final adminEntry in adminsSnap.children) {
+                if (adminEntry.child('admincode').value == adminCode) {
+                  matchedAdminId = adminEntry.key;
+                  break;
                 }
               }
-            },
-            child: const Text("Link"),
-          ),
-        ],
-      ),
-    );
-  }
+
+              if (matchedAdminId != null) {
+                await FirebaseDatabase.instance
+                    .ref('users/${currentUser.uid}')
+                    .update({'linkedAdminId': matchedAdminId});
+
+                if (mounted) Navigator.of(ctx).pop();
+
+                // 🔑 Re-init providers with the new adminId
+                await _initUserData(forceReload: true);
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Successfully linked to admin!')),
+                  );
+                }
+              } else {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Invalid Admin Code')),
+                  );
+                }
+              }
+            } catch (e) {
+              debugPrint('Error linking admin: $e');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Error linking to admin')),
+                );
+              }
+            }
+          },
+          child: const Text("Link"),
+        ),
+      ],
+    ),
+  );
+}
 
   // --- UI methods (unchanged) ---
   void _openAddShowOverlay() {

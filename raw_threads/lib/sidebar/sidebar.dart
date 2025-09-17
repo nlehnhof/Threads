@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:raw_threads/account/app_state.dart';
+
 import 'package:raw_threads/classes/style_classes/my_colors.dart';
 import 'package:raw_threads/pages/real_pages/home_page.dart';
 import 'package:raw_threads/pages/real_pages/new_inv_page.dart';
 import 'package:raw_threads/pages/real_pages/repair_page.dart';
 import 'package:raw_threads/pages/real_pages/profile_page.dart';
 import 'package:raw_threads/pages/real_pages/teams_page.dart';
-import 'package:raw_threads/sidebar/sidebar_item.dart';
-import 'package:provider/provider.dart';
 import 'package:raw_threads/pages/real_pages/welcome_page.dart';
+import 'package:raw_threads/sidebar/sidebar_item.dart';
 
 class Sidebar extends StatelessWidget {
   final String role;
@@ -63,50 +62,67 @@ class Sidebar extends StatelessWidget {
                 destinationBuilder: () => ProfilePage(),
                 image: 'assets/profile.png'),
             const SizedBox(height: 10),
+
+            // Settings / Logout
             SidebarItem(
-              onTap: () {
-                showDialog(
+              image: 'assets/settings.png',
+              onTap: () async {
+                final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (_) => AlertDialog(
                     backgroundColor: myColors.primary,
                     title: Text(
                       'Logout?',
                       style: TextStyle(
-                          fontFamily: 'Vogun',
-                          fontSize: 24,
-                          color: myColors.secondary),
+                        fontFamily: 'Vogun',
+                        fontSize: 24,
+                        color: myColors.secondary,
+                      ),
                     ),
                     actions: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           TextButton(
-                            onPressed: () async {
-                              Navigator.pop(context); // close dialog first
-
-                              // Sign out from Firebase only
-                              await FirebaseAuth.instance.signOut();
-
-                              // No reset(), no navigation — authStateChanges will handle UI.
-                            },
+                            onPressed: () => Navigator.pop(context, true),
                             child: Text(
                               'Logout',
-                              style: TextStyle(fontSize: 18, color: myColors.secondary),
+                              style: TextStyle(
+                                  fontSize: 18, color: myColors.secondary),
                             ),
                           ),
                           TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child:
-                                const Text('Cancel', style: TextStyle(fontSize: 18, color: Colors.red)),
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(fontSize: 18, color: Colors.red),
+                            ),
                           ),
                         ],
                       ),
                     ],
                   ),
                 );
+
+                if (confirmed != true) return;
+
+                try {
+                  // 1️⃣ Sign out from Firebase
+                  await FirebaseAuth.instance.signOut();
+                  // 3️⃣ Close the drawer
+                  Navigator.pop(context);
+
+                  // 4️⃣ Navigate directly to WelcomePage
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const WelcomePage()),
+                    (route) => false,
+                  );
+                } catch (e) {
+                  debugPrint('Logout failed: $e');
+                }
               },
-              image: 'assets/settings.png',
             ),
+
             const SizedBox(height: 24),
           ],
         ),
