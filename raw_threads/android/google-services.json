@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "933160059824",
+    "firebase_url": "https://threads-f1173-default-rtdb.firebaseio.com",
+    "project_id": "threads-f1173",
+    "storage_bucket": "threads-f1173.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:933160059824:android:fb60da699d581a9b7d0c75",
+        "android_client_info": {
+          "package_name": "com.example.raw_threads"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBitJxPKJ2_d1YfaGVIhxVCGaolB9ULRpA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

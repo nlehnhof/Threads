@@ -21,13 +21,13 @@ class ShowsProvider extends ChangeNotifier {
 
   bool _initialized = false; // Add to ShowsProvider
 
+/// Initialize shows, only once per instance
   Future<void> init(DanceInventoryProvider danceProvider) async {
-    if (_initialized) return; // Prevent multiple initializations
+    if (_initialized) return; // <-- prevents duplicates
     _initialized = true;
 
     try {
-      // Clear previous data
-      _shows.clear();
+      _shows.clear(); // clear old shows
       _danceStatuses.clear();
 
       final snapshot = await db.child('admins/$adminId/shows').get();
@@ -39,17 +39,15 @@ class ShowsProvider extends ChangeNotifier {
       final rawData = snapshot.value as Map<dynamic, dynamic>;
       final data = rawData.map((key, value) => MapEntry(key.toString(), value));
 
-      final List<Shows> loadedShows = [];
-      final Map<String, Map<String, DanceStatus>> loadedStatuses = {};
+      final loadedShows = <Shows>[];
+      final loadedStatuses = <String, Map<String, DanceStatus>>{};
 
-      data.forEach((showId, showData) {
-        final showJson = Map<String, dynamic>.from(showData as Map);
+      for (final entry in data.entries) {
+        final showId = entry.key;
+        final showJson = Map<String, dynamic>.from(entry.value as Map);
         final show = Shows.fromJson(showJson);
 
-        // Prevent duplicate show IDs
-        if (!loadedShows.any((s) => s.id == show.id)) {
-          loadedShows.add(show);
-        }
+        loadedShows.add(show);
 
         final danceStatusMap = <String, DanceStatus>{};
         final rawStatuses = showJson['danceStatuses'];
@@ -65,8 +63,9 @@ class ShowsProvider extends ChangeNotifier {
             }
           });
         }
+
         loadedStatuses[show.id] = danceStatusMap;
-      });
+      }
 
       _shows.addAll(loadedShows);
       _danceStatuses.addAll(loadedStatuses);
@@ -76,7 +75,6 @@ class ShowsProvider extends ChangeNotifier {
       debugPrint('Error initializing ShowsProvider: $e');
     }
   }
-
 
   // Add a new show
   Future<void> addShow(Shows show) async {

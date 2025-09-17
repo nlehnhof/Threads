@@ -12,6 +12,7 @@ class TeamProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   bool isLoading = true;
+  bool _initialized = false;
 
   List<Teams> teams = [];
   List<AppUser> linkedUsers = [];
@@ -20,93 +21,96 @@ class TeamProvider extends ChangeNotifier {
 
   TeamProvider();
 
-StreamSubscription<DatabaseEvent>? _teamsSub;
-StreamSubscription<DatabaseEvent>? _usersSub;
+  StreamSubscription<DatabaseEvent>? _teamsSub;
+  StreamSubscription<DatabaseEvent>? _usersSub;
 
-Future<void> init() async {
-  isLoading = true;
-  notifyListeners();
+  Future<void> init() async {
+    if (_initialized) return;
+    _initialized = true;
+    
+    isLoading = true;
+    notifyListeners();
 
-  try {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) return;
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) return;
 
-    // Step 1: Get user role
-    final roleSnap = await _dbRef.child('users/${currentUser.uid}/role').get();
-    final role = roleSnap.exists ? roleSnap.value as String : 'user';
+      // Step 1: Get user role
+      final roleSnap = await _dbRef.child('users/${currentUser.uid}/role').get();
+      final role = roleSnap.exists ? roleSnap.value as String : 'user';
 
-    String? adminId;
-    if (role == 'admin') {
-      adminId = currentUser.uid;
-    } else {
-      // Regular user linked to admin
-      final linkSnap =
-          await _dbRef.child('users/${currentUser.uid}/linkedAdminId').get();
-      adminId = linkSnap.exists ? linkSnap.value as String : null;
+      String? adminId;
+      if (role == 'admin') {
+        adminId = currentUser.uid;
+      } else {
+        // Regular user linked to admin
+        final linkSnap =
+            await _dbRef.child('users/${currentUser.uid}/linkedAdminId').get();
+        adminId = linkSnap.exists ? linkSnap.value as String : null;
 
-      // Store assigned team for user
-      final teamSnap =
-          await _dbRef.child('users/${currentUser.uid}/assignedTeamId').get();
-      assignedTeamId =
-          teamSnap.exists ? teamSnap.value as String : null;
-    }
+        // Store assigned team for user
+        final teamSnap =
+            await _dbRef.child('users/${currentUser.uid}/assignedTeamId').get();
+        assignedTeamId =
+            teamSnap.exists ? teamSnap.value as String : null;
+      }
 
-    if (adminId != null) {
-      // Admin code
-      final codeSnap =
-          await _dbRef.child('admins/$adminId/admincode').get();
-      adminCode = codeSnap.exists
-          ? codeSnap.value as String
-          : adminId.substring(0, 6);
+      if (adminId != null) {
+        // Admin code
+        final codeSnap =
+            await _dbRef.child('admins/$adminId/admincode').get();
+        adminCode = codeSnap.exists
+            ? codeSnap.value as String
+            : adminId.substring(0, 6);
 
-      // --- LISTEN TO TEAMS ---
-      _teamsSub?.cancel();
-      _teamsSub =
-          _dbRef.child('admins/$adminId/teams').onValue.listen((event) {
-        teams = [];
-        if (event.snapshot.exists && event.snapshot.value != null) {
-          (event.snapshot.value as Map).forEach((key, value) {
-            teams.add(Teams.fromJson({
-              'id': key,
-              ...Map<String, dynamic>.from(value)
-            }));
-          });
-        }
-        notifyListeners();
-      });
-
-      // --- LISTEN TO USERS ---
-      _usersSub?.cancel();
-      _usersSub = _dbRef.child('users').onValue.listen((event) {
-        linkedUsers = [];
-        if (event.snapshot.exists && event.snapshot.value != null) {
-          for (final userSnap in event.snapshot.children) {
-            final userMap = userSnap.value as Map<dynamic, dynamic>;
-            if (userMap['linkedAdminId'] == adminId) {
-              linkedUsers.add(AppUser.fromJson({
-                'id': userSnap.key,
-                ...Map<String, dynamic>.from(userMap)
+        // --- LISTEN TO TEAMS ---
+        _teamsSub?.cancel();
+        _teamsSub =
+            _dbRef.child('admins/$adminId/teams').onValue.listen((event) {
+          teams = [];
+          if (event.snapshot.exists && event.snapshot.value != null) {
+            (event.snapshot.value as Map).forEach((key, value) {
+              teams.add(Teams.fromJson({
+                'id': key,
+                ...Map<String, dynamic>.from(value)
               }));
+            });
+          }
+          notifyListeners();
+        });
+
+        // --- LISTEN TO USERS ---
+        _usersSub?.cancel();
+        _usersSub = _dbRef.child('users').onValue.listen((event) {
+          linkedUsers = [];
+          if (event.snapshot.exists && event.snapshot.value != null) {
+            for (final userSnap in event.snapshot.children) {
+              final userMap = userSnap.value as Map<dynamic, dynamic>;
+              if (userMap['linkedAdminId'] == adminId) {
+                linkedUsers.add(AppUser.fromJson({
+                  'id': userSnap.key,
+                  ...Map<String, dynamic>.from(userMap)
+                }));
+              }
             }
           }
-        }
-        notifyListeners();
-      });
+          notifyListeners();
+        });
+      }
+    } catch (e) {
+      debugPrint('TeamProvider init error: $e');
+    } finally {
+      isLoading = false;
+      notifyListeners();
     }
-  } catch (e) {
-    debugPrint('TeamProvider init error: $e');
-  } finally {
-    isLoading = false;
-    notifyListeners();
   }
-}
 
-@override
-void dispose() {
-  _teamsSub?.cancel();
-  _usersSub?.cancel();
-  super.dispose();
-}
+  @override
+  void dispose() {
+    _teamsSub?.cancel();
+    _usersSub?.cancel();
+    super.dispose();
+  }
 
   /// Get username for user ID
   String usernameFor(String uid) {
@@ -125,8 +129,6 @@ void dispose() {
     final teamRef = _dbRef.child('admins/${currentUser.uid}/teams').push();
     final newTeam = Teams(id: teamRef.key!, title: title, members: [], assigned: []);
     await teamRef.set(newTeam.toJson());
-    teams.add(newTeam);
-    notifyListeners();
   }
 
   Future<void> renameTeam(String teamId, String newTitle) async {

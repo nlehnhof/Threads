@@ -70,12 +70,16 @@ class _ShowItemState extends State<ShowItem> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  show.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 28,
-                    fontFamily: 'Vogun',
+                Expanded(
+                  child: Text(
+                    show.title,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 28,
+                      fontFamily: 'Vogun',
+                    ),
                   ),
                 ),
                 if (widget.isAdmin)
