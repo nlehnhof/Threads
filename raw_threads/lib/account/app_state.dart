@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AppState extends ChangeNotifier {
   String? _adminId;
@@ -74,4 +75,16 @@ class AppState extends ChangeNotifier {
     _isInitialized = true;
     notifyListeners();
   }
+
+  Future<void> logout() async {
+  try {
+    // Sign out from Firebase Auth
+    await FirebaseAuth.instance.signOut();
+
+    // Clear all state
+    reset();
+  } catch (e) {
+    debugPrint('Logout failed: $e');
+  }
+}
 }

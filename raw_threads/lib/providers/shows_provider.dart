@@ -19,62 +19,41 @@ class ShowsProvider extends ChangeNotifier {
   Map<String, DanceStatus> getDanceStatuses(String showId) =>
       _danceStatuses[showId] ?? {};
 
-  bool _initialized = false; // Add to ShowsProvider
+  final bool _initialized = false; // Add to ShowsProvider
 
-/// Initialize shows, only once per instance
-  Future<void> init(DanceInventoryProvider danceProvider) async {
-    if (_initialized) return; // <-- prevents duplicates
-    _initialized = true;
+Future<void> init([DanceInventoryProvider? danceProvider]) async {
+  // Load shows
+  final snapshot = await db.child('admins/$adminId/shows').get();
+  if (!snapshot.exists) return;
 
-    try {
-      _shows.clear(); // clear old shows
-      _danceStatuses.clear();
+  final rawData = snapshot.value as Map<dynamic, dynamic>;
 
-      final snapshot = await db.child('admins/$adminId/shows').get();
-      if (!snapshot.exists) {
-        notifyListeners();
-        return;
-      }
+  _shows.clear();
+  _danceStatuses.clear();
 
-      final rawData = snapshot.value as Map<dynamic, dynamic>;
-      final data = rawData.map((key, value) => MapEntry(key.toString(), value));
+  for (var entry in rawData.entries) {
+    final show = Shows.fromJson(Map<String, dynamic>.from(entry.value));
+    _shows.add(show);
 
-      final loadedShows = <Shows>[];
-      final loadedStatuses = <String, Map<String, DanceStatus>>{};
-
-      for (final entry in data.entries) {
-        final showId = entry.key;
-        final showJson = Map<String, dynamic>.from(entry.value as Map);
-        final show = Shows.fromJson(showJson);
-
-        loadedShows.add(show);
-
-        final danceStatusMap = <String, DanceStatus>{};
-        final rawStatuses = showJson['danceStatuses'];
-        if (rawStatuses is Map) {
-          rawStatuses.forEach((danceId, value) {
-            final danceJson = value as Map;
-            final dance = danceProvider.getDanceById(danceId.toString());
-            if (dance != null) {
-              danceStatusMap[danceId.toString()] = DanceStatus(
-                dance: dance,
-                status: danceJson['status']?.toString() ?? 'Not Ready',
-              );
-            }
-          });
+    final danceStatusMap = <String, DanceStatus>{};
+    final rawStatuses = entry.value['danceStatuses'] as Map?;
+    if (rawStatuses != null && danceProvider != null) {
+      rawStatuses.forEach((danceId, value) {
+        final dance = danceProvider.getDanceById(danceId.toString());
+        if (dance != null) {
+          danceStatusMap[danceId.toString()] = DanceStatus(
+            dance: dance,
+            status: value['status']?.toString() ?? 'Not Ready',
+          );
         }
-
-        loadedStatuses[show.id] = danceStatusMap;
-      }
-
-      _shows.addAll(loadedShows);
-      _danceStatuses.addAll(loadedStatuses);
-
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Error initializing ShowsProvider: $e');
+      });
     }
+    _danceStatuses[show.id] = danceStatusMap;
   }
+
+  notifyListeners();
+}
+
 
   // Add a new show
   Future<void> addShow(Shows show) async {

@@ -9,6 +9,7 @@ import 'package:raw_threads/pages/real_pages/profile_page.dart';
 import 'package:raw_threads/pages/real_pages/teams_page.dart';
 import 'package:raw_threads/sidebar/sidebar_item.dart';
 import 'package:provider/provider.dart';
+import 'package:raw_threads/pages/real_pages/welcome_page.dart';
 
 class Sidebar extends StatelessWidget {
   final String role;
@@ -81,9 +82,12 @@ class Sidebar extends StatelessWidget {
                         children: [
                           TextButton(
                             onPressed: () async {
-                              Navigator.pop(context); // close dialog
+                              Navigator.pop(context); // close dialog first
+
+                              // Sign out from Firebase only
                               await FirebaseAuth.instance.signOut();
-                              context.read<AppState>().reset();
+
+                              // No reset(), no navigation — authStateChanges will handle UI.
                             },
                             child: Text(
                               'Logout',

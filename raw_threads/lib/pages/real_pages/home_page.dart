@@ -24,71 +24,63 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   bool get isAdmin => widget.role == 'admin';
-  bool _loading = true;
   bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
+    // Schedule after first build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initUserData();
     });
   }
 
-  Future<void> _initUserData() async {
-    if (_initialized) return;
+  Future<void> _initUserData({bool forceReload = false}) async {
+    if (_initialized && !forceReload) return;
     _initialized = true;
 
     final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
-      setState(() => _loading = false);
-      return;
-    }
+    if (currentUser == null) return;
 
     final appState = context.read<AppState>();
-    final danceProvider = context.read<DanceInventoryProvider>();
-    final showsProvider = context.read<ShowsProvider>();
 
-    // Admin or regular user setup
+    String? targetAdminId;
     if (isAdmin) {
-      debugPrint('User is admin, setting adminId to ${currentUser.uid}');
-      appState.setAdminId(currentUser.uid);
+      targetAdminId = currentUser.uid;
     } else {
-      debugPrint('User is NOT admin, checking linkedAdminId in database');
-      final userSnap = await FirebaseDatabase.instance
-          .ref('users/${currentUser.uid}')
-          .get()
-          .timeout(const Duration(seconds: 10));
+      final userSnap =
+          await FirebaseDatabase.instance.ref('users/${currentUser.uid}').get();
 
-      final linkedAdminId = userSnap.exists && userSnap.child('linkedAdminId').value != null
+      targetAdminId = userSnap.exists &&
+              userSnap.child('linkedAdminId').value != null
           ? userSnap.child('linkedAdminId').value as String
           : null;
 
-      if (linkedAdminId != null) {
-        appState.setAdminId(linkedAdminId);
-      } else {
+      if (targetAdminId == null) {
         appState.setAdminId(null);
-        await _promptAdminLinking();
+        _promptAdminLinking();
+        return; // providers will be reloaded after linking
       }
     }
 
-    final adminId = appState.adminId;
-    if (adminId != null) {
-      try {
-        // Initialize danceProvider only once
-        await danceProvider.init();
-        await showsProvider.init(danceProvider);
-      } catch (e) {
-        debugPrint('Error initializing providers: $e');
-      }
-    }
+    // ✅ Update AppState
+    appState.setAdminId(targetAdminId);
 
-    if (mounted) setState(() => _loading = false);
+    // ✅ Defer provider init to next microtask so context is safe
+    Future.microtask(() async {
+      if (!mounted) return;
+      final danceProvider = context.read<DanceInventoryProvider>();
+      await danceProvider.init();
+
+      final showsProvider = context.read<ShowsProvider>();
+      await showsProvider.init(danceProvider);
+
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _promptAdminLinking() async {
     final controller = TextEditingController();
-    final appState = context.read<AppState>();
 
     await showDialog(
       context: context,
@@ -113,15 +105,10 @@ class _HomePageState extends State<HomePage> {
               if (currentUser == null) return;
 
               try {
-                final adminsSnapshot = await FirebaseDatabase.instance.ref('admins').get();
-                if (!adminsSnapshot.exists) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(content: Text('No admins found')),
-                    );
-                  }
-                  return;
-                }
+                final adminsSnapshot =
+                    await FirebaseDatabase.instance.ref('admins').get();
+
+                if (!adminsSnapshot.exists) return;
 
                 String? matchedAdminId;
                 for (final adminEntry in adminsSnapshot.children) {
@@ -133,35 +120,25 @@ class _HomePageState extends State<HomePage> {
                 }
 
                 if (matchedAdminId != null) {
-                  // Save linkedAdminId under the user
                   await FirebaseDatabase.instance
                       .ref('users/${currentUser.uid}')
                       .update({'linkedAdminId': matchedAdminId});
 
-                  // Update AppState
-                  appState.setAdminId(matchedAdminId);
-
                   if (mounted) Navigator.of(ctx).pop();
 
-                  // Initialize providers
-                  final danceProvider = context.read<DanceInventoryProvider>();
-                  await danceProvider.init();
-                  await context.read<ShowsProvider>().init(danceProvider);
-
-                  if (mounted) setState(() {});
+                  // 🔑 Just reload user data → providers will re-init inside it
+                  await _initUserData(forceReload: true);
                 } else {
                   if (mounted) {
                     ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(content: Text('Invalid Admin Code')),
-                    );
+                        const SnackBar(content: Text('Invalid Admin Code')));
                   }
                 }
               } catch (e) {
                 debugPrint('Error linking admin: $e');
                 if (mounted) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Error linking to admin')),
-                  );
+                      const SnackBar(content: Text('Error linking to admin')));
                 }
               }
             },
@@ -172,6 +149,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // --- UI methods (unchanged) ---
   void _openAddShowOverlay() {
     showModalBottomSheet(
       context: context,
@@ -214,18 +192,6 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final adminId = appState.adminId;
-
-    if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (adminId == null) {
-      return const Scaffold(
-        body: Center(child: Text('Please link your account to an admin.')),
-      );
-    }
 
     final danceProvider = context.watch<DanceInventoryProvider>();
     final showsProvider = context.watch<ShowsProvider>();
@@ -271,13 +237,17 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: ShowsList(
-                onRemoveShow: isAdmin ? _removeShow : null,
-                onEditShow: isAdmin ? _editShow : null,
-                allDances: danceProvider.dances,
-                isAdmin: isAdmin,
-                shows: showsProvider.shows,
-              ),
+              child: adminId == null
+                  ? const Center(
+                      child: Text('Please link your account to an admin.'),
+                    )
+                  : ShowsList(
+                      onRemoveShow: isAdmin ? _removeShow : null,
+                      onEditShow: isAdmin ? _editShow : null,
+                      allDances: danceProvider.dances,
+                      shows: showsProvider.shows,
+                      isAdmin: isAdmin,
+                    ),
             ),
             if (isAdmin)
               PrimaryButton(
