@@ -54,30 +54,25 @@ Future<void> _initUserData({bool forceReload = false}) async {
 
     if (targetAdminId == null) {
       appState.setAdminId(null);
-      await _promptAdminLinking(); // wait until user links to admin
-      return; // providers will re-init after linking
+      await _promptAdminLinking();
+      return; // ⚠️ don't initialize providers until linked
     }
   }
 
-  // Update AppState
   appState.setAdminId(targetAdminId);
 
-  // Initialize dependent providers safely
-  Future.microtask(() async {
-    if (!mounted) return;
-
+  // Only initialize providers if adminId exists
     final danceProvider = context.read<DanceInventoryProvider>();
+    final showsProvider = context.read<ShowsProvider>();
+
     if (!danceProvider.isInitialized || forceReload) {
       await danceProvider.init();
     }
-
-    final showsProvider = context.read<ShowsProvider>();
     if (!showsProvider.isInitialized || forceReload) {
       await showsProvider.init(danceProvider);
     }
 
     if (mounted) setState(() {});
-  });
 }
 
 Future<void> _promptAdminLinking() async {
@@ -198,6 +193,16 @@ Future<void> _promptAdminLinking() async {
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final adminId = appState.adminId;
+
+    if (adminId == null) {
+      // User is unlinked — don't touch providers
+      return Scaffold(
+        backgroundColor: myColors.secondary,
+        body: const Center(
+          child: Text('Please link your account to an admin.'),
+        ),
+      );
+    }
 
     final danceProvider = context.watch<DanceInventoryProvider>();
     final showsProvider = context.watch<ShowsProvider>();

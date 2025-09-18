@@ -8,6 +8,7 @@ import 'package:raw_threads/pages/real_pages/repair_page.dart';
 import 'package:raw_threads/pages/real_pages/profile_page.dart';
 import 'package:raw_threads/pages/real_pages/teams_page.dart';
 import 'package:raw_threads/pages/real_pages/welcome_page.dart';
+import 'package:raw_threads/services/auth_service.dart';
 import 'package:raw_threads/sidebar/sidebar_item.dart';
 
 class Sidebar extends StatelessWidget {
@@ -108,7 +109,7 @@ class Sidebar extends StatelessWidget {
 
                 try {
                   // 1️⃣ Sign out from Firebase
-                  await FirebaseAuth.instance.signOut();
+                  await authService.value.signOut();
                   // 3️⃣ Close the drawer
                   Navigator.pop(context);
 

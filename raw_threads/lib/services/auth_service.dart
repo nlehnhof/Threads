@@ -275,7 +275,13 @@ Future<User> createAccount({
 
   User? get currentUser => _auth.currentUser;
 
-  Future<void> signOut() async {
-    await _auth.signOut();
+Future<void> signOut() async {
+    try {
+      await _auth.signOut();
+      debugPrint("User signed out successfully.");
+    } catch (e) {
+      debugPrint("Sign out failed: $e");
+      rethrow;
+    }
   }
 }
