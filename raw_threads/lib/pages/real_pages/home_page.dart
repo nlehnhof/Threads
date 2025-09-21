@@ -67,9 +67,11 @@ Future<void> _initUserData({bool forceReload = false}) async {
 
     if (!danceProvider.isInitialized || forceReload) {
       await danceProvider.init();
+      _initialized = true;
     }
     if (!showsProvider.isInitialized || forceReload) {
       await showsProvider.init(danceProvider);
+      _initialized = true;
     }
 
     if (mounted) setState(() {});

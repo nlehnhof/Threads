@@ -143,7 +143,7 @@ class _ShowItemState extends State<ShowItem> {
                           elevation: 2,
                           margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          color: myColors.primary,
+                          color: const Color(0xFFBFCCC2),
                           child: Padding( 
                             padding: const EdgeInsets.all(12),
                             child: Row(
