@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:raw_threads/providers/dance_inventory_provider.dart';
 import 'package:raw_threads/providers/teams_provider.dart';
 import 'package:raw_threads/pages/show_builds/edit_show_page.dart';
+import 'package:raw_threads/classes/style_classes/my_colors.dart';
 
 class ShowItem extends StatefulWidget {
   final Shows show;
@@ -138,23 +139,27 @@ class _ShowItemState extends State<ShowItem> {
                       final assignedTeamNames =
                           teamProvider.getTeamNamesForDance(dance.id);
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Card(
-                          child: Row(
+                      return Card(
+                          elevation: 2,
+                          margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          color: myColors.primary,
+                          child: Padding( 
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                             Text(dance.title,
                                 style: const TextStyle(
-                                    fontSize: 14, fontFamily: 'Vogun')),
+                                    fontSize: 20, fontFamily: 'Vogun', color: Colors.white)),
                             if (assignedTeamNames.isNotEmpty)
                               Text(
-                                '${assignedTeamNames.join(", ")}',
+                                '${assignedTeamNames.join(" / ")}',
                                 style: const TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 16,
                                   fontFamily: 'Vogun',
                                   fontStyle: FontStyle.italic,
-                                  color: Colors.grey,
+                                  color: Colors.white,
                                 ),
                               )
                             else
