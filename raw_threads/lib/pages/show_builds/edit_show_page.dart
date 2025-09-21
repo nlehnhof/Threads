@@ -127,7 +127,6 @@ class _EditShowPageState extends State<EditShowPage> {
       tech: _techController.text,
       dress: _dressController.text,
       location: _locationController.text,
-      category: widget.show.category,
       danceIds: _selectedDanceIds,
       adminId: widget.show.adminId,
     );

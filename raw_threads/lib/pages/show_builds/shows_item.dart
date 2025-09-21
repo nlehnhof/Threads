@@ -140,15 +140,16 @@ class _ShowItemState extends State<ShowItem> {
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 6),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                        child: Card(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
                             Text(dance.title,
                                 style: const TextStyle(
                                     fontSize: 14, fontFamily: 'Vogun')),
                             if (assignedTeamNames.isNotEmpty)
                               Text(
-                                'Teams: ${assignedTeamNames.join(", ")}',
+                                '${assignedTeamNames.join(", ")}',
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontFamily: 'Vogun',
@@ -167,6 +168,7 @@ class _ShowItemState extends State<ShowItem> {
                                 ),
                               ),
                           ],
+                        ),
                         ),
                       );
                     }),

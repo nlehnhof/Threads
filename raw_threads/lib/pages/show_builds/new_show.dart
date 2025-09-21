@@ -20,7 +20,6 @@ class _NewShowState extends State<NewShow> {
   late TextEditingController _locationController;
   late TextEditingController _techController;
   late TextEditingController _dressController;
-  late Category _selectedCategory;
   final _focusNode = FocusNode();
   final uuid = const Uuid();
 
@@ -32,7 +31,6 @@ class _NewShowState extends State<NewShow> {
     _locationController = TextEditingController(text: widget.existingShow?.location ?? '');
     _techController = TextEditingController(text: widget.existingShow?.tech ?? '');
     _dressController = TextEditingController(text: widget.existingShow?.dress ?? '');
-    _selectedCategory = widget.existingShow?.category ?? Category.ifde;
   }
 
   Future<void> _submitShowData() async {
@@ -50,7 +48,6 @@ class _NewShowState extends State<NewShow> {
       dress: _dressController.text,
       tech: _techController.text,
       adminId: adminId,
-      category: _selectedCategory,
       danceIds: widget.existingShow?.danceIds ?? [],
     );
 
@@ -128,22 +125,6 @@ class _NewShowState extends State<NewShow> {
           const SizedBox(height: 16),
           Row(
             children: [
-              DropdownButton(
-                value: _selectedCategory,
-                items: Category.values
-                    .map((category) => DropdownMenuItem(
-                          value: category,
-                          child: Text(category.name.toUpperCase()),
-                        ))
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _selectedCategory = value;
-                    });
-                  }
-                },
-              ),
               const Spacer(),
               TextButton(
                 onPressed: () => Navigator.pop(context),
